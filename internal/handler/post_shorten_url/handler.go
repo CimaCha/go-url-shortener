@@ -37,7 +37,7 @@ func (h ShortenUrlHandler) ServeHTTP(res http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	finalUrl := req.Host + "/" + url
+	finalUrl := "http://" + req.Host + "/" + url
 	res.WriteHeader(201)
 	res.Header().Set("Content-Type", "text/plain")
 	_, err = res.Write([]byte(finalUrl))
