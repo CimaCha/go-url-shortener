@@ -1,7 +1,6 @@
 package post_shorten_url
 
 import (
-	"context"
 	"fmt"
 	"github.com/CimaCha/go-url-shortener/internal/service"
 	"io"
@@ -9,12 +8,11 @@ import (
 )
 
 type ShortenUrlHandler struct {
-	ctx     context.Context
 	service service.Service
 }
 
-func NewShortenUrlHandler(ctx context.Context, service service.Service) ShortenUrlHandler {
-	return ShortenUrlHandler{ctx: ctx, service: service}
+func NewShortenUrlHandler(service service.Service) ShortenUrlHandler {
+	return ShortenUrlHandler{service: service}
 }
 
 func (h ShortenUrlHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
@@ -33,7 +31,7 @@ func (h ShortenUrlHandler) ServeHTTP(res http.ResponseWriter, req *http.Request)
 		fmt.Print(err)
 		return
 	}
-	url, err := h.service.SetShortUrl(h.ctx, string(body))
+	url, err := h.service.SetShortUrl(string(body))
 	if err != nil {
 		fmt.Print(err)
 		return

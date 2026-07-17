@@ -1,23 +1,19 @@
 package main
 
 import (
-	"context"
 	"github.com/CimaCha/go-url-shortener/internal/handler/get_full_url"
 	"github.com/CimaCha/go-url-shortener/internal/handler/post_shorten_url"
-	"github.com/CimaCha/go-url-shortener/internal/repository"
 	"github.com/CimaCha/go-url-shortener/internal/service"
 	"net/http"
+	"sync"
 )
 
 func main() {
-	ctx := context.Background()
+	storage := sync.Map{}
+	shortenUrlService := service.NewService(&storage)
 
-	redisClient := repository.NewRedisClient(`localhost:6379`)
-
-	shortenUrlService := service.NewService(redisClient)
-
-	shortenUrlHandler := post_shorten_url.NewShortenUrlHandler(ctx, shortenUrlService)
-	getFullUrlHandler := get_full_url.NewGetFullUrlHandler(ctx, shortenUrlService)
+	shortenUrlHandler := post_shorten_url.NewShortenUrlHandler(shortenUrlService)
+	getFullUrlHandler := get_full_url.NewGetFullUrlHandler(shortenUrlService)
 
 	mux := http.NewServeMux()
 	mux.Handle(`/`, shortenUrlHandler)

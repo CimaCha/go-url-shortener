@@ -1,13 +1,11 @@
 package service
 
 import (
-	"context"
 	"crypto/sha1"
 	"encoding/base64"
 	"errors"
-	"time"
-
-	"github.com/redis/go-redis/v9"
+	"fmt"
+	"sync"
 )
 
 var (
@@ -15,14 +13,12 @@ var (
 	ErrURLNotFound = errors.New("URL not found")
 )
 
-const urlTTL = 30 * 24 * time.Hour
-
 type Service struct {
-	redisClient *redis.Client
+	storage *sync.Map
 }
 
-func NewService(redisClient *redis.Client) Service {
-	return Service{redisClient: redisClient}
+func NewService(storage *sync.Map) Service {
+	return Service{storage: storage}
 }
 
 func ShortenUrl(fullURL string) string {
@@ -31,27 +27,22 @@ func ShortenUrl(fullURL string) string {
 	return shortURL
 }
 
-func (s Service) SetShortUrl(ctx context.Context, fullURL string) (string, error) {
+func (s Service) SetShortUrl(fullURL string) (string, error) {
 	if fullURL == "" {
 		return "", ErrEmptyURL
 	}
 	shortUrl := ShortenUrl(fullURL)
-	if err := s.redisClient.Set(ctx, shortUrl, fullURL, urlTTL).Err(); err != nil {
-		return "", err
-	}
+	s.storage.Store(shortUrl, fullURL)
 	return shortUrl, nil
 }
 
-func (s Service) GetFullUrl(ctx context.Context, shortUrl string) (string, error) {
+func (s Service) GetFullUrl(shortUrl string) (string, error) {
 	if shortUrl == "" {
 		return "", ErrEmptyURL
 	}
-	fullURL, err := s.redisClient.Get(ctx, shortUrl).Result()
-	if errors.Is(err, redis.Nil) {
+	fullURL, exists := s.storage.Load(shortUrl)
+	if !exists {
 		return "", ErrURLNotFound
 	}
-	if err != nil {
-		return "", err
-	}
-	return fullURL, nil
+	return fmt.Sprint(fullURL), nil
 }
