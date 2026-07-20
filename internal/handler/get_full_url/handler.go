@@ -1,7 +1,6 @@
 package get_full_url
 
 import (
-	"fmt"
 	"github.com/CimaCha/go-url-shortener/internal/service"
 	"net/http"
 	"net/url"
@@ -26,15 +25,16 @@ func (h GetFullHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 	fullUrl, err := h.service.GetFullUrl(id)
 	if err != nil {
-		fmt.Print(err)
+		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	fullUrl, err = url.QueryUnescape(fullUrl)
 	if err != nil {
-		fmt.Print(err)
+		http.Error(res, "Escaping URL error", http.StatusInternalServerError)
 		return
 	}
+
 	res.Header().Add("Location", fullUrl)
 
 	res.WriteHeader(307)

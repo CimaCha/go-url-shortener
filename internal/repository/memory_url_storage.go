@@ -16,9 +16,8 @@ func NewMemoryURLStorage() *MemoryURLStorage {
 	return &MemoryURLStorage{urls: &urls}
 }
 
-func (s *MemoryURLStorage) SetShortUrl(shortURL string, fullURL string) error {
+func (s *MemoryURLStorage) SetShortUrl(shortURL string, fullURL string) {
 	s.urls.Store(shortURL, fullURL)
-	return nil
 }
 
 func (s *MemoryURLStorage) GetFullUrl(shortURL string) (string, error) {

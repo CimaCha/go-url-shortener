@@ -1,6 +1,7 @@
 package post_shorten_url
 
 import (
+	"errors"
 	"fmt"
 	"github.com/CimaCha/go-url-shortener/internal/service"
 	"io"
@@ -24,25 +25,26 @@ func (h ShortenUrlHandler) ServeHTTP(res http.ResponseWriter, req *http.Request)
 
 	if req.Header.Get("Content-Type") != "text/plain" {
 		http.Error(res, "Content-Type must be text/plain", http.StatusUnsupportedMediaType)
+		return
 	}
 
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
-		fmt.Print(err)
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	url, err := h.service.SetShortUrl(string(body))
 	if err != nil {
-		fmt.Print(err)
+		if errors.Is(err, service.ErrEmptyURL) {
+			http.Error(res, err.Error(), http.StatusBadRequest)
+		} else {
+			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		}
 		return
 	}
 
 	finalUrl := fmt.Sprintf("http://%s/%s\n", req.Host, url)
-	res.WriteHeader(201)
 	res.Header().Set("Content-Type", "text/plain")
-	_, err = res.Write([]byte(finalUrl))
-	if err != nil {
-		fmt.Print(err)
-		return
-	}
+	res.WriteHeader(http.StatusCreated)
+	_, _ = res.Write([]byte(finalUrl))
 }
