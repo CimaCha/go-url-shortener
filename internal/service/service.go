@@ -5,19 +5,18 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"sync"
+	"github.com/CimaCha/go-url-shortener/internal/repository"
 )
 
 var (
-	ErrEmptyURL    = errors.New("empty URL")
-	ErrURLNotFound = errors.New("URL not found")
+	ErrEmptyURL = errors.New("empty URL")
 )
 
 type Service struct {
-	storage *sync.Map
+	storage repository.UrlStorage
 }
 
-func NewService(storage *sync.Map) Service {
+func NewService(storage repository.UrlStorage) Service {
 	return Service{storage: storage}
 }
 
@@ -32,7 +31,10 @@ func (s Service) SetShortUrl(fullURL string) (string, error) {
 		return "", ErrEmptyURL
 	}
 	shortUrl := ShortenUrl(fullURL)
-	s.storage.Store(shortUrl, fullURL)
+	err := s.storage.SetShortUrl(shortUrl, fullURL)
+	if err != nil {
+		return "", err
+	}
 	return shortUrl, nil
 }
 
@@ -40,9 +42,9 @@ func (s Service) GetFullUrl(shortUrl string) (string, error) {
 	if shortUrl == "" {
 		return "", ErrEmptyURL
 	}
-	fullURL, exists := s.storage.Load(shortUrl)
-	if !exists {
-		return "", ErrURLNotFound
+	fullURL, err := s.storage.GetFullUrl(shortUrl)
+	if err != nil {
+		return "", err
 	}
 	return fmt.Sprint(fullURL), nil
 }
