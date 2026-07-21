@@ -10,7 +10,7 @@ type GetFullHandler struct {
 	service service.Service
 }
 
-func NewGetFullUrlHandler(service service.Service) GetFullHandler {
+func NewGetFullURLHandler(service service.Service) GetFullHandler {
 	return GetFullHandler{service: service}
 }
 
@@ -23,19 +23,19 @@ func (h GetFullHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 	id := req.PathValue("id")
 
-	fullUrl, err := h.service.GetFullUrl(id)
+	fullURL, err := h.service.GetFullURL(id)
 	if err != nil {
 		http.Error(res, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	fullUrl, err = url.QueryUnescape(fullUrl)
+	fullURL, err = url.QueryUnescape(fullURL)
 	if err != nil {
 		http.Error(res, "Escaping URL error", http.StatusInternalServerError)
 		return
 	}
 
-	res.Header().Add("Location", fullUrl)
+	res.Header().Add("Location", fullURL)
 
 	res.WriteHeader(307)
 }

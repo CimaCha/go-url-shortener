@@ -66,7 +66,7 @@ func TestShortenUrlHandler(t *testing.T) {
 			if tt.setup != nil {
 				tt.setup(storage)
 			}
-			handler := NewShortenUrlHandler(service.NewService(storage))
+			handler := NewShortenURLHandler(service.NewService(storage))
 			var body io.Reader = strings.NewReader(tt.body)
 			if tt.readError {
 				body = errorReader{}

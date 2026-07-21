@@ -8,15 +8,15 @@ import (
 	"net/http"
 )
 
-type ShortenUrlHandler struct {
+type ShortenURLHandler struct {
 	service service.Service
 }
 
-func NewShortenUrlHandler(service service.Service) ShortenUrlHandler {
-	return ShortenUrlHandler{service: service}
+func NewShortenURLHandler(service service.Service) ShortenURLHandler {
+	return ShortenURLHandler{service: service}
 }
 
-func (h ShortenUrlHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
+func (h ShortenURLHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 	if req.Method != http.MethodPost {
 		http.Error(res, "Only POST requests are allowed!", http.StatusMethodNotAllowed)
@@ -33,7 +33,7 @@ func (h ShortenUrlHandler) ServeHTTP(res http.ResponseWriter, req *http.Request)
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	url, err := h.service.SetShortUrl(string(body))
+	url, err := h.service.SetShortURL(string(body))
 	if err != nil {
 		if errors.Is(err, service.ErrEmptyURL) {
 			http.Error(res, err.Error(), http.StatusBadRequest)
@@ -43,8 +43,8 @@ func (h ShortenUrlHandler) ServeHTTP(res http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	finalUrl := fmt.Sprintf("http://%s/%s\n", req.Host, url)
+	finalURL := fmt.Sprintf("http://%s/%s\n", req.Host, url)
 	res.Header().Set("Content-Type", "text/plain")
 	res.WriteHeader(http.StatusCreated)
-	_, _ = res.Write([]byte(finalUrl))
+	_, _ = res.Write([]byte(finalURL))
 }

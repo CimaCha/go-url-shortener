@@ -23,10 +23,10 @@ func TestMemoryURLStorage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			storage := NewMemoryURLStorage()
 			for _, write := range tt.writes {
-				storage.SetShortUrl(write[0], write[1])
+				storage.SetShortURL(write[0], write[1])
 			}
 
-			got, err := storage.GetFullUrl(tt.shortURL)
+			got, err := storage.GetFullURL(tt.shortURL)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 			} else {

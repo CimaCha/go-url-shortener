@@ -13,36 +13,36 @@ var (
 )
 
 type Service struct {
-	storage repository.UrlStorage
+	storage repository.URLStorage
 }
 
-func NewService(storage repository.UrlStorage) Service {
+func NewService(storage repository.URLStorage) Service {
 	return Service{storage: storage}
 }
 
-func ShortenUrl(fullURL string) string {
+func ShortenURL(fullURL string) string {
 	digest := sha1.Sum([]byte(fullURL))
 	shortURL := base64.RawURLEncoding.EncodeToString(digest[:])
 	return shortURL
 }
 
-func (s Service) SetShortUrl(fullURL string) (string, error) {
+func (s Service) SetShortURL(fullURL string) (string, error) {
 	if fullURL == "" {
 		return "", ErrEmptyURL
 	}
-	shortUrl := ShortenUrl(fullURL)
-	err := s.storage.SetShortUrl(shortUrl, fullURL)
+	shortURL := ShortenURL(fullURL)
+	err := s.storage.SetShortURL(shortURL, fullURL)
 	if err != nil {
 		return "", err
 	}
-	return shortUrl, nil
+	return shortURL, nil
 }
 
-func (s Service) GetFullUrl(shortUrl string) (string, error) {
+func (s Service) GetFullURL(shortUrl string) (string, error) {
 	if shortUrl == "" {
 		return "", ErrEmptyURL
 	}
-	fullURL, err := s.storage.GetFullUrl(shortUrl)
+	fullURL, err := s.storage.GetFullURL(shortUrl)
 	if err != nil {
 		return "", err
 	}

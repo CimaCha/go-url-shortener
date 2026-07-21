@@ -39,10 +39,10 @@ func (m *MockUrlStorage) EXPECT() *MockUrlStorageMockRecorder {
 	return m.recorder
 }
 
-// GetFullUrl mocks base method.
-func (m *MockUrlStorage) GetFullUrl(shortURL string) (string, error) {
+// GetFullURL mocks base method.
+func (m *MockUrlStorage) GetFullURL(shortURL string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetFullUrl", shortURL)
+	ret := m.ctrl.Call(m, "GetFullURL", shortURL)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
@@ -51,13 +51,13 @@ func (m *MockUrlStorage) GetFullUrl(shortURL string) (string, error) {
 // GetFullUrl indicates an expected call of GetFullUrl.
 func (mr *MockUrlStorageMockRecorder) GetFullUrl(shortURL any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFullUrl", reflect.TypeOf((*MockUrlStorage)(nil).GetFullUrl), shortURL)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFullURL", reflect.TypeOf((*MockUrlStorage)(nil).GetFullURL), shortURL)
 }
 
-// SetShortUrl mocks base method.
-func (m *MockUrlStorage) SetShortUrl(shortURL, fullURL string) error {
+// SetShortURL mocks base method.
+func (m *MockUrlStorage) SetShortURL(shortURL, fullURL string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetShortUrl", shortURL, fullURL)
+	ret := m.ctrl.Call(m, "SetShortURL", shortURL, fullURL)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
@@ -65,5 +65,5 @@ func (m *MockUrlStorage) SetShortUrl(shortURL, fullURL string) error {
 // SetShortUrl indicates an expected call of SetShortUrl.
 func (mr *MockUrlStorageMockRecorder) SetShortUrl(shortURL, fullURL any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetShortUrl", reflect.TypeOf((*MockUrlStorage)(nil).SetShortUrl), shortURL, fullURL)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetShortURL", reflect.TypeOf((*MockUrlStorage)(nil).SetShortURL), shortURL, fullURL)
 }

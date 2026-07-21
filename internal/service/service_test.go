@@ -24,7 +24,7 @@ func TestShortenUrl(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, ShortenUrl(tt.fullURL))
+			assert.Equal(t, tt.want, ShortenURL(tt.fullURL))
 		})
 	}
 }
@@ -64,7 +64,7 @@ func TestServiceSetShortUrl(t *testing.T) {
 				tt.setup(storage)
 			}
 
-			got, err := NewService(storage).SetShortUrl(tt.fullURL)
+			got, err := NewService(storage).SetShortURL(tt.fullURL)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 			} else {
@@ -118,7 +118,7 @@ func TestServiceGetFullUrl(t *testing.T) {
 				tt.setup(storage)
 			}
 
-			got, err := NewService(storage).GetFullUrl(tt.shortURL)
+			got, err := NewService(storage).GetFullURL(tt.shortURL)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 			} else {

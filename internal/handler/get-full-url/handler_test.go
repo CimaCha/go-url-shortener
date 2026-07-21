@@ -71,7 +71,7 @@ func TestGetFullUrlHandler(t *testing.T) {
 			if tt.setup != nil {
 				tt.setup(storage)
 			}
-			handler := NewGetFullUrlHandler(service.NewService(storage))
+			handler := NewGetFullURLHandler(service.NewService(storage))
 			request := httptest.NewRequest(tt.method, "/"+tt.shortURL, nil)
 			request.SetPathValue("id", tt.shortURL)
 			response := httptest.NewRecorder()

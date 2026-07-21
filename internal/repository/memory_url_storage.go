@@ -16,11 +16,11 @@ func NewMemoryURLStorage() *MemoryURLStorage {
 	return &MemoryURLStorage{urls: &urls}
 }
 
-func (s *MemoryURLStorage) SetShortUrl(shortURL string, fullURL string) {
+func (s *MemoryURLStorage) SetShortURL(shortURL string, fullURL string) {
 	s.urls.Store(shortURL, fullURL)
 }
 
-func (s *MemoryURLStorage) GetFullUrl(shortURL string) (string, error) {
+func (s *MemoryURLStorage) GetFullURL(shortURL string) (string, error) {
 	fullURL, ok := s.urls.Load(shortURL)
 	if !ok {
 		return "", ErrURLNotFound
