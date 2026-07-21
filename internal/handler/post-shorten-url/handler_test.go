@@ -14,8 +14,6 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-var errHandlerStorage = errors.New("storage error")
-
 type errorReader struct{}
 
 func (errorReader) Read([]byte) (int, error) { return 0, errors.New("read error") }
@@ -27,7 +25,7 @@ func TestShortenUrlHandler(t *testing.T) {
 		contentType string
 		body        string
 		readError   bool
-		setup       func(*mocks.MockUrlStorage)
+		setup       func(*mocks.MockURLStorage)
 		wantStatus  int
 		wantBody    string
 	}{
@@ -37,8 +35,8 @@ func TestShortenUrlHandler(t *testing.T) {
 			method:      http.MethodPost,
 			contentType: "text/plain",
 			body:        "https://example.com/path",
-			setup: func(storage *mocks.MockUrlStorage) {
-				storage.EXPECT().SetShortUrl("q8T575iSknB5NIL7Yf_g5s9Bnjk", "https://example.com/path").Return(nil)
+			setup: func(storage *mocks.MockURLStorage) {
+				storage.EXPECT().SetShortURL("q8T575iSknB5NIL7Yf_g5s9Bnjk", "https://example.com/path")
 			},
 			wantStatus: http.StatusCreated,
 			wantBody:   "http://short.test/q8T575iSknB5NIL7Yf_g5s9Bnjk\n",
@@ -46,23 +44,12 @@ func TestShortenUrlHandler(t *testing.T) {
 		{name: "unsupported content type", method: http.MethodPost, contentType: "application/json", body: "https://example.com/path", wantStatus: http.StatusUnsupportedMediaType, wantBody: "Content-Type must be text/plain\n"},
 		{name: "empty URL", method: http.MethodPost, contentType: "text/plain", wantStatus: http.StatusBadRequest, wantBody: "empty URL\n"},
 		{name: "body read error", method: http.MethodPost, contentType: "text/plain", readError: true, wantStatus: http.StatusInternalServerError, wantBody: "Internal Server Error\n"},
-		{
-			name:        "storage error",
-			method:      http.MethodPost,
-			contentType: "text/plain",
-			body:        "https://example.com",
-			setup: func(storage *mocks.MockUrlStorage) {
-				storage.EXPECT().SetShortUrl("Mnw_2ofOKGhIpXSYLd0LfHSH-BY", "https://example.com").Return(errHandlerStorage)
-			},
-			wantStatus: http.StatusInternalServerError,
-			wantBody:   "Internal Server Error\n",
-		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			controller := gomock.NewController(t)
-			storage := mocks.NewMockUrlStorage(controller)
+			storage := mocks.NewMockURLStorage(controller)
 			if tt.setup != nil {
 				tt.setup(storage)
 			}

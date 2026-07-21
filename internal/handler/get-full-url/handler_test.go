@@ -20,7 +20,7 @@ func TestGetFullUrlHandler(t *testing.T) {
 		name         string
 		method       string
 		shortURL     string
-		setup        func(*mocks.MockUrlStorage)
+		setup        func(*mocks.MockURLStorage)
 		wantStatus   int
 		wantLocation string
 	}{
@@ -29,8 +29,8 @@ func TestGetFullUrlHandler(t *testing.T) {
 			name:     "stored URL",
 			method:   http.MethodGet,
 			shortURL: "short",
-			setup: func(storage *mocks.MockUrlStorage) {
-				storage.EXPECT().GetFullUrl("short").Return("https://example.com/path", nil)
+			setup: func(storage *mocks.MockURLStorage) {
+				storage.EXPECT().GetFullURL("short").Return("https://example.com/path", nil)
 			},
 			wantStatus:   http.StatusTemporaryRedirect,
 			wantLocation: "https://example.com/path",
@@ -39,8 +39,8 @@ func TestGetFullUrlHandler(t *testing.T) {
 			name:     "missing URL",
 			method:   http.MethodGet,
 			shortURL: "missing",
-			setup: func(storage *mocks.MockUrlStorage) {
-				storage.EXPECT().GetFullUrl("missing").Return("", repository.ErrURLNotFound)
+			setup: func(storage *mocks.MockURLStorage) {
+				storage.EXPECT().GetFullURL("missing").Return("", repository.ErrURLNotFound)
 			},
 			wantStatus: http.StatusInternalServerError,
 		},
@@ -48,8 +48,8 @@ func TestGetFullUrlHandler(t *testing.T) {
 			name:     "invalid escaped URL",
 			method:   http.MethodGet,
 			shortURL: "short",
-			setup: func(storage *mocks.MockUrlStorage) {
-				storage.EXPECT().GetFullUrl("short").Return("%", nil)
+			setup: func(storage *mocks.MockURLStorage) {
+				storage.EXPECT().GetFullURL("short").Return("%", nil)
 			},
 			wantStatus: http.StatusInternalServerError,
 		},
@@ -57,8 +57,8 @@ func TestGetFullUrlHandler(t *testing.T) {
 			name:     "storage error",
 			method:   http.MethodGet,
 			shortURL: "short",
-			setup: func(storage *mocks.MockUrlStorage) {
-				storage.EXPECT().GetFullUrl("short").Return("", errHandlerStorage)
+			setup: func(storage *mocks.MockURLStorage) {
+				storage.EXPECT().GetFullURL("short").Return("", errHandlerStorage)
 			},
 			wantStatus: http.StatusInternalServerError,
 		},
@@ -67,7 +67,7 @@ func TestGetFullUrlHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			controller := gomock.NewController(t)
-			storage := mocks.NewMockUrlStorage(controller)
+			storage := mocks.NewMockURLStorage(controller)
 			if tt.setup != nil {
 				tt.setup(storage)
 			}

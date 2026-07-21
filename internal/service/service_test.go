@@ -12,7 +12,7 @@ import (
 
 var errStorage = errors.New("storage error")
 
-func TestShortenUrl(t *testing.T) {
+func TestShortenURL(t *testing.T) {
 	tests := []struct {
 		name    string
 		fullURL string
@@ -29,11 +29,11 @@ func TestShortenUrl(t *testing.T) {
 	}
 }
 
-func TestServiceSetShortUrl(t *testing.T) {
+func TestServiceSetShortURL(t *testing.T) {
 	tests := []struct {
 		name    string
 		fullURL string
-		setup   func(*mocks.MockUrlStorage)
+		setup   func(*mocks.MockURLStorage)
 		want    string
 		wantErr error
 	}{
@@ -41,25 +41,17 @@ func TestServiceSetShortUrl(t *testing.T) {
 		{
 			name:    "stores URL",
 			fullURL: "https://example.com/path",
-			setup: func(storage *mocks.MockUrlStorage) {
-				storage.EXPECT().SetShortUrl("q8T575iSknB5NIL7Yf_g5s9Bnjk", "https://example.com/path").Return(nil)
+			setup: func(storage *mocks.MockURLStorage) {
+				storage.EXPECT().SetShortURL("q8T575iSknB5NIL7Yf_g5s9Bnjk", "https://example.com/path")
 			},
 			want: "q8T575iSknB5NIL7Yf_g5s9Bnjk",
-		},
-		{
-			name:    "storage error",
-			fullURL: "https://example.com/path",
-			setup: func(storage *mocks.MockUrlStorage) {
-				storage.EXPECT().SetShortUrl("q8T575iSknB5NIL7Yf_g5s9Bnjk", "https://example.com/path").Return(errStorage)
-			},
-			wantErr: errStorage,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			controller := gomock.NewController(t)
-			storage := mocks.NewMockUrlStorage(controller)
+			storage := mocks.NewMockURLStorage(controller)
 			if tt.setup != nil {
 				tt.setup(storage)
 			}
@@ -75,11 +67,11 @@ func TestServiceSetShortUrl(t *testing.T) {
 	}
 }
 
-func TestServiceGetFullUrl(t *testing.T) {
+func TestServiceGetFullURL(t *testing.T) {
 	tests := []struct {
 		name     string
 		shortURL string
-		setup    func(*mocks.MockUrlStorage)
+		setup    func(*mocks.MockURLStorage)
 		want     string
 		wantErr  error
 	}{
@@ -87,24 +79,24 @@ func TestServiceGetFullUrl(t *testing.T) {
 		{
 			name:     "stored URL",
 			shortURL: "short",
-			setup: func(storage *mocks.MockUrlStorage) {
-				storage.EXPECT().GetFullUrl("short").Return("https://example.com", nil)
+			setup: func(storage *mocks.MockURLStorage) {
+				storage.EXPECT().GetFullURL("short").Return("https://example.com", nil)
 			},
 			want: "https://example.com",
 		},
 		{
 			name:     "missing URL",
 			shortURL: "missing",
-			setup: func(storage *mocks.MockUrlStorage) {
-				storage.EXPECT().GetFullUrl("missing").Return("", repository.ErrURLNotFound)
+			setup: func(storage *mocks.MockURLStorage) {
+				storage.EXPECT().GetFullURL("missing").Return("", repository.ErrURLNotFound)
 			},
 			wantErr: repository.ErrURLNotFound,
 		},
 		{
 			name:     "storage error",
 			shortURL: "short",
-			setup: func(storage *mocks.MockUrlStorage) {
-				storage.EXPECT().GetFullUrl("short").Return("", errStorage)
+			setup: func(storage *mocks.MockURLStorage) {
+				storage.EXPECT().GetFullURL("short").Return("", errStorage)
 			},
 			wantErr: errStorage,
 		},
@@ -113,7 +105,7 @@ func TestServiceGetFullUrl(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			controller := gomock.NewController(t)
-			storage := mocks.NewMockUrlStorage(controller)
+			storage := mocks.NewMockURLStorage(controller)
 			if tt.setup != nil {
 				tt.setup(storage)
 			}

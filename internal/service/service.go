@@ -31,10 +31,7 @@ func (s Service) SetShortURL(fullURL string) (string, error) {
 		return "", ErrEmptyURL
 	}
 	shortURL := ShortenURL(fullURL)
-	err := s.storage.SetShortURL(shortURL, fullURL)
-	if err != nil {
-		return "", err
-	}
+	s.storage.SetShortURL(shortURL, fullURL)
 	return shortURL, nil
 }
 

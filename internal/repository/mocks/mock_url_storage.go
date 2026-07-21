@@ -15,32 +15,32 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockUrlStorage is a mock of UrlStorage interface.
-type MockUrlStorage struct {
+// MockURLStorage is a mock of URLStorage interface.
+type MockURLStorage struct {
 	ctrl     *gomock.Controller
-	recorder *MockUrlStorageMockRecorder
+	recorder *MockURLStorageMockRecorder
 	isgomock struct{}
 }
 
-// MockUrlStorageMockRecorder is the mock recorder for MockUrlStorage.
-type MockUrlStorageMockRecorder struct {
-	mock *MockUrlStorage
+// MockURLStorageMockRecorder is the mock recorder for MockURLStorage.
+type MockURLStorageMockRecorder struct {
+	mock *MockURLStorage
 }
 
-// NewMockUrlStorage creates a new mock instance.
-func NewMockUrlStorage(ctrl *gomock.Controller) *MockUrlStorage {
-	mock := &MockUrlStorage{ctrl: ctrl}
-	mock.recorder = &MockUrlStorageMockRecorder{mock}
+// NewMockURLStorage creates a new mock instance.
+func NewMockURLStorage(ctrl *gomock.Controller) *MockURLStorage {
+	mock := &MockURLStorage{ctrl: ctrl}
+	mock.recorder = &MockURLStorageMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockUrlStorage) EXPECT() *MockUrlStorageMockRecorder {
+func (m *MockURLStorage) EXPECT() *MockURLStorageMockRecorder {
 	return m.recorder
 }
 
 // GetFullURL mocks base method.
-func (m *MockUrlStorage) GetFullURL(shortURL string) (string, error) {
+func (m *MockURLStorage) GetFullURL(shortURL string) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetFullURL", shortURL)
 	ret0, _ := ret[0].(string)
@@ -48,22 +48,20 @@ func (m *MockUrlStorage) GetFullURL(shortURL string) (string, error) {
 	return ret0, ret1
 }
 
-// GetFullUrl indicates an expected call of GetFullUrl.
-func (mr *MockUrlStorageMockRecorder) GetFullUrl(shortURL any) *gomock.Call {
+// GetFullURL indicates an expected call of GetFullURL.
+func (mr *MockURLStorageMockRecorder) GetFullURL(shortURL any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFullURL", reflect.TypeOf((*MockUrlStorage)(nil).GetFullURL), shortURL)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFullURL", reflect.TypeOf((*MockURLStorage)(nil).GetFullURL), shortURL)
 }
 
 // SetShortURL mocks base method.
-func (m *MockUrlStorage) SetShortURL(shortURL, fullURL string) error {
+func (m *MockURLStorage) SetShortURL(shortURL, fullURL string) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetShortURL", shortURL, fullURL)
-	ret0, _ := ret[0].(error)
-	return ret0
+	m.ctrl.Call(m, "SetShortURL", shortURL, fullURL)
 }
 
-// SetShortUrl indicates an expected call of SetShortUrl.
-func (mr *MockUrlStorageMockRecorder) SetShortUrl(shortURL, fullURL any) *gomock.Call {
+// SetShortURL indicates an expected call of SetShortURL.
+func (mr *MockURLStorageMockRecorder) SetShortURL(shortURL, fullURL any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetShortURL", reflect.TypeOf((*MockUrlStorage)(nil).SetShortURL), shortURL, fullURL)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetShortURL", reflect.TypeOf((*MockURLStorage)(nil).SetShortURL), shortURL, fullURL)
 }
