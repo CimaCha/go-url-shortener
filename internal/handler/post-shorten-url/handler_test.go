@@ -41,9 +41,9 @@ func TestShortenUrlHandler(t *testing.T) {
 			wantStatus: http.StatusCreated,
 			wantBody:   "http://short.test/q8T575iSknB5NIL7Yf_g5s9Bnjk",
 		},
-		{name: "unsupported content type", method: http.MethodPost, contentType: "application/json", body: "https://example.com/path", wantStatus: http.StatusUnsupportedMediaType, wantBody: "Content-Type must be text/plain"},
-		{name: "empty URL", method: http.MethodPost, contentType: "text/plain", wantStatus: http.StatusBadRequest, wantBody: "empty URL"},
-		{name: "body read error", method: http.MethodPost, contentType: "text/plain", readError: true, wantStatus: http.StatusInternalServerError, wantBody: "Internal Server Error"},
+		{name: "unsupported content type", method: http.MethodPost, contentType: "application/json", body: "https://example.com/path", wantStatus: http.StatusUnsupportedMediaType, wantBody: "Content-Type must be text/plain\n"},
+		{name: "empty URL", method: http.MethodPost, contentType: "text/plain", wantStatus: http.StatusBadRequest, wantBody: "empty URL\n"},
+		{name: "body read error", method: http.MethodPost, contentType: "text/plain", readError: true, wantStatus: http.StatusInternalServerError, wantBody: "Internal Server Error\n"},
 	}
 
 	for _, tt := range tests {
