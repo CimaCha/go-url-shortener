@@ -10,6 +10,8 @@ import (
 
 	"github.com/CimaCha/go-url-shortener/internal/repository/mocks"
 	"github.com/CimaCha/go-url-shortener/internal/service"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
@@ -29,7 +31,7 @@ func TestShortenUrlHandler(t *testing.T) {
 		wantStatus  int
 		wantBody    string
 	}{
-		{name: "method not allowed", method: http.MethodGet, wantStatus: http.StatusMethodNotAllowed, wantBody: "Only POST requests are allowed!\n"},
+		{name: "method not allowed", method: http.MethodGet, wantStatus: http.StatusMethodNotAllowed},
 		{
 			name:        "successful request",
 			method:      http.MethodPost,
@@ -41,7 +43,7 @@ func TestShortenUrlHandler(t *testing.T) {
 			wantStatus: http.StatusCreated,
 			wantBody:   "http://short.test/q8T575iSknB5NIL7Yf_g5s9Bnjk",
 		},
-		{name: "unsupported content type", method: http.MethodPost, contentType: "application/json", body: "https://example.com/path", wantStatus: http.StatusUnsupportedMediaType, wantBody: "Content-Type must be text/plain\n"},
+		{name: "unsupported content type", method: http.MethodPost, contentType: "application/json", body: "https://example.com/path", wantStatus: http.StatusUnsupportedMediaType},
 		{name: "empty URL", method: http.MethodPost, contentType: "text/plain", wantStatus: http.StatusBadRequest, wantBody: "empty URL\n"},
 		{name: "body read error", method: http.MethodPost, contentType: "text/plain", readError: true, wantStatus: http.StatusInternalServerError, wantBody: "Internal Server Error\n"},
 	}
@@ -54,6 +56,9 @@ func TestShortenUrlHandler(t *testing.T) {
 				tt.setup(storage)
 			}
 			handler := NewShortenURLHandler(service.NewService(storage))
+			router := chi.NewRouter()
+			router.With(middleware.AllowContentType("text/plain")).
+				Method(http.MethodPost, "/", handler)
 			var body io.Reader = strings.NewReader(tt.body)
 			if tt.readError {
 				body = errorReader{}
@@ -63,7 +68,7 @@ func TestShortenUrlHandler(t *testing.T) {
 			request.Header.Set("Content-Type", tt.contentType)
 			response := httptest.NewRecorder()
 
-			handler.ServeHTTP(response, request)
+			router.ServeHTTP(response, request)
 
 			assert.Equal(t, tt.wantStatus, response.Code)
 			assert.Equal(t, tt.wantBody, response.Body.String())

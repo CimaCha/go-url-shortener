@@ -3,7 +3,8 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"io"
+	"gopkg.in/h2non/gentleman.v2"
+	body2 "gopkg.in/h2non/gentleman.v2/plugins/body"
 	"net/http"
 	"os"
 	"strings"
@@ -23,29 +24,23 @@ func main() {
 	}
 	long = strings.TrimSuffix(long, "\n")
 	// добавляем HTTP-клиент
-	client := &http.Client{}
+	client := gentleman.New()
+	client.URL(endpoint)
+
 	// пишем запрос
 	// запрос методом POST должен, помимо заголовков, содержать тело
 	// тело должно быть источником потокового чтения io.Reader
-	request, err := http.NewRequest(http.MethodPost, endpoint, strings.NewReader(long))
-	if err != nil {
-		panic(err)
-	}
-	// в заголовках запроса указываем кодировку
-	request.Header.Add("Content-Type", "text/plain")
-	// отправляем запрос и получаем ответ
-	response, err := client.Do(request)
+	request := client.Request().
+		Method(http.MethodPost).
+		SetHeader("Content-Type", "text/plain").
+		Use(body2.Reader(strings.NewReader(long)))
+	response, err := request.Send()
 	if err != nil {
 		panic(err)
 	}
 	// выводим код ответа
-	fmt.Println("Статус-код ", response.Status)
-	defer response.Body.Close()
+	fmt.Println("Статус-код ", response.StatusCode)
 	// читаем поток из тела ответа
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		panic(err)
-	}
 	// и печатаем его
-	fmt.Println(string(body))
+	fmt.Println(response.String())
 }

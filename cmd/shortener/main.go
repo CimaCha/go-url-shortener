@@ -5,6 +5,9 @@ import (
 	"github.com/CimaCha/go-url-shortener/internal/handler/post-shorten-url"
 	"github.com/CimaCha/go-url-shortener/internal/repository"
 	"github.com/CimaCha/go-url-shortener/internal/service"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"log"
 	"net/http"
 )
 
@@ -15,12 +18,13 @@ func main() {
 	shortenUrlHandler := post_shorten_url.NewShortenURLHandler(shortenUrlService)
 	getFullUrlHandler := get_full_url.NewGetFullURLHandler(shortenUrlService)
 
-	mux := http.NewServeMux()
-	mux.Handle(`/`, shortenUrlHandler)
-	mux.Handle(`/{id}`, getFullUrlHandler)
+	router := chi.NewRouter()
+	router.Use(middleware.Logger)
+	router.Route("/", func(r chi.Router) {
+		router.With(middleware.AllowContentType("text/plain")).
+			Method(http.MethodPost, "/", shortenUrlHandler)
+		router.Method(http.MethodGet, `/{id}`, getFullUrlHandler)
+	})
 
-	err := http.ListenAndServe(`:8080`, mux)
-	if err != nil {
-		panic(err)
-	}
+	log.Fatal(http.ListenAndServe(`:8080`, router))
 }

@@ -18,16 +18,6 @@ func NewShortenURLHandler(service service.Service) ShortenURLHandler {
 
 func (h ShortenURLHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
-	if req.Method != http.MethodPost {
-		http.Error(res, "Only POST requests are allowed!", http.StatusMethodNotAllowed)
-		return
-	}
-
-	if req.Header.Get("Content-Type") != "text/plain" {
-		http.Error(res, "Content-Type must be text/plain", http.StatusUnsupportedMediaType)
-		return
-	}
-
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)

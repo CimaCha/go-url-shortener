@@ -9,6 +9,7 @@ import (
 	"github.com/CimaCha/go-url-shortener/internal/repository"
 	"github.com/CimaCha/go-url-shortener/internal/repository/mocks"
 	"github.com/CimaCha/go-url-shortener/internal/service"
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
@@ -24,7 +25,7 @@ func TestGetFullUrlHandler(t *testing.T) {
 		wantStatus   int
 		wantLocation string
 	}{
-		{name: "method not allowed", method: http.MethodPost, wantStatus: http.StatusMethodNotAllowed},
+		{name: "method not allowed", method: http.MethodPost, shortURL: "short", wantStatus: http.StatusMethodNotAllowed},
 		{
 			name:     "stored URL",
 			method:   http.MethodGet,
@@ -72,11 +73,12 @@ func TestGetFullUrlHandler(t *testing.T) {
 				tt.setup(storage)
 			}
 			handler := NewGetFullURLHandler(service.NewService(storage))
+			router := chi.NewRouter()
+			router.Method(http.MethodGet, "/{id}", handler)
 			request := httptest.NewRequest(tt.method, "/"+tt.shortURL, nil)
-			request.SetPathValue("id", tt.shortURL)
 			response := httptest.NewRecorder()
 
-			handler.ServeHTTP(response, request)
+			router.ServeHTTP(response, request)
 
 			assert.Equal(t, tt.wantStatus, response.Code)
 			assert.Equal(t, tt.wantLocation, response.Header().Get("Location"))

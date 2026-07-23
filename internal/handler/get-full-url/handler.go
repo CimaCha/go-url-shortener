@@ -2,6 +2,7 @@ package get_full_url
 
 import (
 	"github.com/CimaCha/go-url-shortener/internal/service"
+	"github.com/go-chi/chi/v5"
 	"net/http"
 	"net/url"
 )
@@ -16,12 +17,7 @@ func NewGetFullURLHandler(service service.Service) GetFullHandler {
 
 func (h GetFullHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
-	if req.Method != http.MethodGet {
-		http.Error(res, "Only GET requests are allowed!", http.StatusMethodNotAllowed)
-		return
-	}
-
-	id := req.PathValue("id")
+	id := chi.URLParam(req, "id")
 
 	fullURL, err := h.service.GetFullURL(id)
 	if err != nil {
@@ -36,6 +32,5 @@ func (h GetFullHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	}
 
 	res.Header().Add("Location", fullURL)
-
 	res.WriteHeader(307)
 }
