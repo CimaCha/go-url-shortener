@@ -2,6 +2,7 @@ package post_shorten_url
 
 import (
 	"errors"
+	"github.com/CimaCha/go-url-shortener/internal/config/flag"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -41,7 +42,7 @@ func TestShortenUrlHandler(t *testing.T) {
 				storage.EXPECT().SetShortURL("q8T575iSknB5NIL7Yf_g5s9Bnjk", "https://example.com/path")
 			},
 			wantStatus: http.StatusCreated,
-			wantBody:   "http://short.test/q8T575iSknB5NIL7Yf_g5s9Bnjk",
+			wantBody:   "http://localhost:8080/q8T575iSknB5NIL7Yf_g5s9Bnjk",
 		},
 		{name: "unsupported content type", method: http.MethodPost, contentType: "application/json", body: "https://example.com/path", wantStatus: http.StatusUnsupportedMediaType},
 		{name: "empty URL", method: http.MethodPost, contentType: "text/plain", wantStatus: http.StatusBadRequest, wantBody: "empty URL\n"},
@@ -55,7 +56,8 @@ func TestShortenUrlHandler(t *testing.T) {
 			if tt.setup != nil {
 				tt.setup(storage)
 			}
-			handler := NewShortenURLHandler(service.NewService(storage))
+			netAddress := flag.NewNetAddress("localhost", "8080")
+			handler := NewShortenURLHandler(service.NewService(storage), *netAddress)
 			router := chi.NewRouter()
 			router.With(middleware.AllowContentType("text/plain")).
 				Method(http.MethodPost, "/", handler)

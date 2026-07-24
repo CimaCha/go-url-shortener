@@ -3,17 +3,19 @@ package post_shorten_url
 import (
 	"errors"
 	"fmt"
+	"github.com/CimaCha/go-url-shortener/internal/config/flag"
 	"github.com/CimaCha/go-url-shortener/internal/service"
 	"io"
 	"net/http"
 )
 
 type ShortenURLHandler struct {
-	service service.Service
+	service        service.Service
+	defaultAddress flag.NetAddress
 }
 
-func NewShortenURLHandler(service service.Service) ShortenURLHandler {
-	return ShortenURLHandler{service: service}
+func NewShortenURLHandler(service service.Service, defaultAddress flag.NetAddress) ShortenURLHandler {
+	return ShortenURLHandler{service: service, defaultAddress: defaultAddress}
 }
 
 func (h ShortenURLHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
@@ -33,7 +35,7 @@ func (h ShortenURLHandler) ServeHTTP(res http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	finalURL := fmt.Sprintf("http://%s/%s", req.Host, url)
+	finalURL := fmt.Sprintf("http://%s/%s", h.defaultAddress.String(), url)
 	res.Header().Set("Content-Type", "text/plain")
 	res.WriteHeader(http.StatusCreated)
 	_, _ = res.Write([]byte(finalURL))

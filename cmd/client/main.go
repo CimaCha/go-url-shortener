@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	endpoint := "http://localhost:8080/"
+	endpoint := "http://localhost:8081/"
 	// контейнер данных для запроса
 	// приглашение в консоли
 	fmt.Println("Введите длинный URL")
