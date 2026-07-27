@@ -10,12 +10,12 @@ import (
 )
 
 type ShortenURLHandler struct {
-	service        service.Service
-	defaultAddress flag.NetAddress
+	service             service.Service
+	defaultShortAddress flag.BasicShortAddress
 }
 
-func NewShortenURLHandler(service service.Service, defaultAddress flag.NetAddress) ShortenURLHandler {
-	return ShortenURLHandler{service: service, defaultAddress: defaultAddress}
+func NewShortenURLHandler(service service.Service, defaultShortAddress flag.BasicShortAddress) ShortenURLHandler {
+	return ShortenURLHandler{service: service, defaultShortAddress: defaultShortAddress}
 }
 
 func (h ShortenURLHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
@@ -35,7 +35,7 @@ func (h ShortenURLHandler) ServeHTTP(res http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	finalURL := fmt.Sprintf("http://%s/%s", h.defaultAddress.String(), url)
+	finalURL := fmt.Sprintf("%s/%s", h.defaultShortAddress.String(), url)
 	res.Header().Set("Content-Type", "text/plain")
 	res.WriteHeader(http.StatusCreated)
 	_, _ = res.Write([]byte(finalURL))

@@ -56,8 +56,8 @@ func TestShortenUrlHandler(t *testing.T) {
 			if tt.setup != nil {
 				tt.setup(storage)
 			}
-			netAddress := flag.NewNetAddress("localhost", "8080")
-			handler := NewShortenURLHandler(service.NewService(storage), *netAddress)
+			shortAddress := flag.NewBasicShortAddress("http://localhost:8080")
+			handler := NewShortenURLHandler(service.NewService(storage), *shortAddress)
 			router := chi.NewRouter()
 			router.With(middleware.AllowContentType("text/plain")).
 				Method(http.MethodPost, "/", handler)
