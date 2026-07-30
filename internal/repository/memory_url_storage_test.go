@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,4 +37,33 @@ func TestMemoryURLStorage(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestMemoryURLStorageConcurrentAccess(t *testing.T) {
+	storage := NewMemoryURLStorage()
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+
+	for worker := range 32 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+
+			key := strconv.Itoa(worker)
+			for range 100 {
+				if err := storage.SetShortURL(key, key); err != nil {
+					t.Errorf("SetShortURL() error = %v", err)
+					return
+				}
+				if got, err := storage.GetFullURL(key); err != nil || got != key {
+					t.Errorf("GetFullURL() = %q, %v; want %q, nil", got, err, key)
+					return
+				}
+			}
+		}()
+	}
+
+	close(start)
+	wg.Wait()
 }

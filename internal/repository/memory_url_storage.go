@@ -5,26 +5,36 @@ import (
 	"sync"
 )
 
-var ErrURLNotFound = errors.New("URL not found")
+var (
+	ErrURLNotFound = errors.New("URL not found")
+)
 
 type MemoryURLStorage struct {
-	urls *sync.Map
+	mu   sync.RWMutex
+	urls map[string]string
 }
 
 func NewMemoryURLStorage() *MemoryURLStorage {
-	urls := sync.Map{}
-	return &MemoryURLStorage{urls: &urls}
+	urls := map[string]string{}
+	return &MemoryURLStorage{urls: urls}
 }
 
-func (s *MemoryURLStorage) SetShortURL(shortURL string, fullURL string) {
-	s.urls.Store(shortURL, fullURL)
+func (s *MemoryURLStorage) SetShortURL(shortURL string, fullURL string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.urls[shortURL] = fullURL
+	return nil
 }
 
 func (s *MemoryURLStorage) GetFullURL(shortURL string) (string, error) {
-	fullURL, ok := s.urls.Load(shortURL)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	fullURL, ok := s.urls[shortURL]
 	if !ok {
 		return "", ErrURLNotFound
 	}
 
-	return fullURL.(string), nil
+	return fullURL, nil
 }
