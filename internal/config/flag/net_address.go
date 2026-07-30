@@ -3,37 +3,32 @@ package flag
 import (
 	"flag"
 	"fmt"
-	"strings"
 )
 
 type NetAddress struct {
-	host string
-	port string
+	URL string
 }
 
-func NewNetAddress(host string, port string) *NetAddress {
-	return &NetAddress{host: host, port: port}
+func NewNetAddress(url string) *NetAddress {
+	return &NetAddress{URL: url}
 }
 
 func NewNetAddressFlag(flagName string, flagUsage string) *NetAddress {
 	netAddress := NetAddress{
-		host: "localhost",
-		port: "8080",
+		URL: "localhost:8080",
 	}
 	flag.Var(&netAddress, flagName, flagUsage)
 	return &netAddress
 }
 
 func (netAddress *NetAddress) String() string {
-	return fmt.Sprintf("%s:%s", netAddress.host, netAddress.port)
+	return netAddress.URL
 }
 
 func (netAddress *NetAddress) Set(value string) error {
-	address := strings.Split(value, ":")
-	if len(address) != 2 {
-		return fmt.Errorf("invalid net address: %s", value)
+	if value == "" {
+		return fmt.Errorf("url should not be empty")
 	}
-	netAddress.host = address[0]
-	netAddress.port = address[1]
+	netAddress.URL = value
 	return nil
 }

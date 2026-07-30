@@ -1,28 +1,29 @@
 package service
 
 import (
-	"crypto/sha1"
-	"encoding/base64"
 	"errors"
-	"fmt"
 	"github.com/CimaCha/go-url-shortener/internal/repository"
+	"strconv"
+	"time"
 )
 
 var (
-	ErrEmptyURL = errors.New("empty URL")
+	ErrEmptyURL    = errors.New("empty URL")
+	ErrURLNotFound = errors.New("URL not found")
+	ErrRepository  = errors.New("error in repository")
 )
 
 type Service struct {
-	storage repository.URLStorage
+	storage URLStorage
 }
 
-func NewService(storage repository.URLStorage) Service {
+func NewService(storage URLStorage) Service {
 	return Service{storage: storage}
 }
 
-func ShortenURL(fullURL string) string {
-	digest := sha1.Sum([]byte(fullURL))
-	shortURL := base64.RawURLEncoding.EncodeToString(digest[:])
+func generateShortUrl() string {
+	timeStamp := time.Now().UnixNano()
+	shortURL := strconv.FormatInt(timeStamp, 36)
 	return shortURL
 }
 
@@ -30,8 +31,11 @@ func (s Service) SetShortURL(fullURL string) (string, error) {
 	if fullURL == "" {
 		return "", ErrEmptyURL
 	}
-	shortURL := ShortenURL(fullURL)
-	s.storage.SetShortURL(shortURL, fullURL)
+	shortURL := generateShortUrl()
+	err := s.storage.SetShortURL(shortURL, fullURL)
+	if err != nil {
+		return "", ErrRepository
+	}
 	return shortURL, nil
 }
 
@@ -41,7 +45,10 @@ func (s Service) GetFullURL(shortUrl string) (string, error) {
 	}
 	fullURL, err := s.storage.GetFullURL(shortUrl)
 	if err != nil {
-		return "", err
+		if errors.Is(err, repository.ErrURLNotFound) {
+			return "", ErrURLNotFound
+		}
+		return "", ErrRepository
 	}
-	return fmt.Sprint(fullURL), nil
+	return fullURL, nil
 }

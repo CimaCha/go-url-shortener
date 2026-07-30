@@ -16,11 +16,11 @@ func TestCLIFlags(t *testing.T) {
 		wantB     string
 		wantError string
 	}{
-		{name: "default addresses", wantA: "localhost:8080", wantB: "http://localhost:8080"},
+		{name: "default addresses", wantA: "localhost:8080", wantB: "localhost:8080"},
 		{name: "addresses from CLI", args: []string{"-a", "server:9090", "-b", "https://short.example"}, wantA: "server:9090", wantB: "https://short.example"},
-		{name: "service address without port", args: []string{"-a", "server"}, wantA: "localhost:8080", wantB: "http://localhost:8080", wantError: "invalid net address: server"},
-		{name: "service address with extra separator", args: []string{"-a", "server:9090:extra"}, wantA: "localhost:8080", wantB: "http://localhost:8080", wantError: "invalid net address: server:9090:extra"},
-		{name: "empty base address", args: []string{"-b", ""}, wantA: "localhost:8080", wantB: "http://localhost:8080", wantError: "url should not be empty"},
+		{name: "address without port", args: []string{"-a", "server"}, wantA: "server", wantB: "localhost:8080"},
+		{name: "address with extra separator", args: []string{"-a", "server:9090:extra"}, wantA: "server:9090:extra", wantB: "localhost:8080"},
+		{name: "empty base address", args: []string{"-b", ""}, wantA: "localhost:8080", wantB: "localhost:8080", wantError: "url should not be empty"},
 	}
 
 	originalCommandLine := stdflag.CommandLine
@@ -31,7 +31,7 @@ func TestCLIFlags(t *testing.T) {
 			stdflag.CommandLine = stdflag.NewFlagSet(t.Name(), stdflag.ContinueOnError)
 			stdflag.CommandLine.SetOutput(io.Discard)
 			serviceAddress := NewNetAddressFlag("a", "address of service")
-			shortAddress := NewBasicShortAddressFlag("b", "basic address for short URL")
+			shortAddress := NewNetAddressFlag("b", "basic address for short URL")
 
 			err := stdflag.CommandLine.Parse(tt.args)
 
