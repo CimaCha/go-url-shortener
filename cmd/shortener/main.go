@@ -15,8 +15,8 @@ import (
 
 func main() {
 
-	netAddress := flag2.NewNetAddressFlag("a", "address of service")
-	basicShortAddress := flag2.NewNetAddressFlag("b", "basic address for short url")
+	netAddress := flag2.NewNetAddressFlag("a", "address of service", "localhost:8080")
+	basicShortAddress := flag2.NewNetAddressFlag("b", "basic address for short url", "http://localhost:8080")
 
 	flag.Parse()
 
