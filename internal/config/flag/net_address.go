@@ -15,7 +15,7 @@ func NewNetAddress(url string) *NetAddress {
 
 func NewNetAddressFlag(flagName string, flagUsage string) *NetAddress {
 	netAddress := NetAddress{
-		URL: "localhost:8080",
+		URL: "http://localhost:8080",
 	}
 	flag.Var(&netAddress, flagName, flagUsage)
 	return &netAddress
