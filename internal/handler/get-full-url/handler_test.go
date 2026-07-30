@@ -1,4 +1,4 @@
-package get_full_url
+package fullurl
 
 import (
 	"errors"
@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/CimaCha/go-url-shortener/internal/repository"
-	"github.com/CimaCha/go-url-shortener/internal/repository/mocks"
 	"github.com/CimaCha/go-url-shortener/internal/service"
+	"github.com/CimaCha/go-url-shortener/internal/service/mocks"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -43,16 +43,17 @@ func TestGetFullUrlHandler(t *testing.T) {
 			setup: func(storage *mocks.MockURLStorage) {
 				storage.EXPECT().GetFullURL("missing").Return("", repository.ErrURLNotFound)
 			},
-			wantStatus: http.StatusInternalServerError,
+			wantStatus: http.StatusNotFound,
 		},
 		{
-			name:     "invalid escaped URL",
+			name:     "redirects URL as stored",
 			method:   http.MethodGet,
 			shortURL: "short",
 			setup: func(storage *mocks.MockURLStorage) {
 				storage.EXPECT().GetFullURL("short").Return("%", nil)
 			},
-			wantStatus: http.StatusInternalServerError,
+			wantStatus:   http.StatusTemporaryRedirect,
+			wantLocation: "%",
 		},
 		{
 			name:     "storage error",

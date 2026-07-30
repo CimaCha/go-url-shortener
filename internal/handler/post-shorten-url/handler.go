@@ -1,4 +1,4 @@
-package post_shorten_url
+package shortenurl
 
 import (
 	"errors"
@@ -9,16 +9,16 @@ import (
 	"net/http"
 )
 
-type ShortenURLHandler struct {
+type Handler struct {
 	service             service.Service
-	defaultShortAddress flag.BasicShortAddress
+	defaultShortAddress flag.NetAddress
 }
 
-func NewShortenURLHandler(service service.Service, defaultShortAddress flag.BasicShortAddress) ShortenURLHandler {
-	return ShortenURLHandler{service: service, defaultShortAddress: defaultShortAddress}
+func NewShortenURLHandler(service service.Service, defaultShortAddress flag.NetAddress) Handler {
+	return Handler{service: service, defaultShortAddress: defaultShortAddress}
 }
 
-func (h ShortenURLHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
+func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 	body, err := io.ReadAll(req.Body)
 	if err != nil {

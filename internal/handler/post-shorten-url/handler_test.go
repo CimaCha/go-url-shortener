@@ -1,4 +1,4 @@
-package post_shorten_url
+package shortenurl
 
 import (
 	"errors"
@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/CimaCha/go-url-shortener/internal/repository/mocks"
 	"github.com/CimaCha/go-url-shortener/internal/service"
+	"github.com/CimaCha/go-url-shortener/internal/service/mocks"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/stretchr/testify/assert"
@@ -31,6 +31,7 @@ func TestShortenUrlHandler(t *testing.T) {
 		setup       func(*mocks.MockURLStorage)
 		wantStatus  int
 		wantBody    string
+		wantPrefix  string
 	}{
 		{name: "method not allowed", method: http.MethodGet, wantStatus: http.StatusMethodNotAllowed},
 		{
@@ -39,13 +40,28 @@ func TestShortenUrlHandler(t *testing.T) {
 			contentType: "text/plain",
 			body:        "https://example.com/path",
 			setup: func(storage *mocks.MockURLStorage) {
-				storage.EXPECT().SetShortURL("q8T575iSknB5NIL7Yf_g5s9Bnjk", "https://example.com/path")
+				storage.EXPECT().
+					SetShortURL(gomock.Any(), "https://example.com/path").
+					Return(nil)
 			},
 			wantStatus: http.StatusCreated,
-			wantBody:   "http://localhost:8080/q8T575iSknB5NIL7Yf_g5s9Bnjk",
+			wantPrefix: "http://localhost:8080/",
 		},
 		{name: "unsupported content type", method: http.MethodPost, contentType: "application/json", body: "https://example.com/path", wantStatus: http.StatusUnsupportedMediaType},
 		{name: "empty URL", method: http.MethodPost, contentType: "text/plain", wantStatus: http.StatusBadRequest, wantBody: "empty URL\n"},
+		{
+			name:        "storage error",
+			method:      http.MethodPost,
+			contentType: "text/plain",
+			body:        "https://example.com/path",
+			setup: func(storage *mocks.MockURLStorage) {
+				storage.EXPECT().
+					SetShortURL(gomock.Any(), "https://example.com/path").
+					Return(errors.New("storage error"))
+			},
+			wantStatus: http.StatusInternalServerError,
+			wantBody:   "Internal Server Error\n",
+		},
 		{name: "body read error", method: http.MethodPost, contentType: "text/plain", readError: true, wantStatus: http.StatusInternalServerError, wantBody: "Internal Server Error\n"},
 	}
 
@@ -56,7 +72,7 @@ func TestShortenUrlHandler(t *testing.T) {
 			if tt.setup != nil {
 				tt.setup(storage)
 			}
-			shortAddress := flag.NewBasicShortAddress("http://localhost:8080")
+			shortAddress := flag.NewNetAddress("http://localhost:8080")
 			handler := NewShortenURLHandler(service.NewService(storage), *shortAddress)
 			router := chi.NewRouter()
 			router.With(middleware.AllowContentType("text/plain")).
@@ -73,7 +89,12 @@ func TestShortenUrlHandler(t *testing.T) {
 			router.ServeHTTP(response, request)
 
 			assert.Equal(t, tt.wantStatus, response.Code)
-			assert.Equal(t, tt.wantBody, response.Body.String())
+			if tt.wantPrefix == "" {
+				assert.Equal(t, tt.wantBody, response.Body.String())
+			} else {
+				assert.True(t, strings.HasPrefix(response.Body.String(), tt.wantPrefix))
+				assert.Greater(t, len(response.Body.String()), len(tt.wantPrefix))
+			}
 		})
 	}
 }

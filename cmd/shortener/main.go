@@ -2,7 +2,9 @@ package main
 
 import (
 	"flag"
-	"fmt"
+	"log"
+	"net/http"
+
 	flag2 "github.com/CimaCha/go-url-shortener/internal/config/flag"
 	"github.com/CimaCha/go-url-shortener/internal/handler/get-full-url"
 	"github.com/CimaCha/go-url-shortener/internal/handler/post-shorten-url"
@@ -21,13 +23,13 @@ func main() {
 
 	flag.Parse()
 
-	fmt.Printf("address of service is: %s\n", netAddress.String())
-	fmt.Printf("basic address for short url is: %s\n", basicShortAddress.String())
+	log.Printf("address of service is: %s\n", netAddress.String())
+	log.Printf("basic address for short url is: %s\n", basicShortAddress.String())
 	storage := repository.NewMemoryURLStorage()
 	shortenUrlService := service.NewService(storage)
 
-	shortenUrlHandler := post_shorten_url.NewShortenURLHandler(shortenUrlService, *basicShortAddress)
-	getFullUrlHandler := get_full_url.NewGetFullURLHandler(shortenUrlService)
+	shortenUrlHandler := shortenurl.NewShortenURLHandler(shortenUrlService, *basicShortAddress)
+	getFullUrlHandler := fullurl.NewGetFullURLHandler(shortenUrlService)
 
 	router := chi.NewRouter()
 	router.Use(middleware.Logger)
