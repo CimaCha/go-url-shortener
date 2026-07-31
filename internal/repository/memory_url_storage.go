@@ -6,7 +6,8 @@ import (
 )
 
 var (
-	ErrURLNotFound = errors.New("URL not found")
+	ErrURLNotFound    = errors.New("URL not found")
+	ErrShortURLExists = errors.New("Short URL already exists")
 )
 
 type MemoryURLStorage struct {
@@ -22,7 +23,10 @@ func NewMemoryURLStorage() *MemoryURLStorage {
 func (s *MemoryURLStorage) SetShortURL(shortURL string, fullURL string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
+	_, ok := s.urls[shortURL]
+	if ok {
+		return ErrShortURLExists
+	}
 	s.urls[shortURL] = fullURL
 	return nil
 }
