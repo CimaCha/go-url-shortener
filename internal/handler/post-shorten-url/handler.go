@@ -3,17 +3,24 @@ package shortenurl
 import (
 	"errors"
 	"fmt"
-	"github.com/CimaCha/go-url-shortener/internal/service"
 	"io"
 	"net/http"
+
+	"github.com/CimaCha/go-url-shortener/internal/service"
 )
 
+//go:generate mockgen -source=handler.go -destination=mocks/mock_url_service.gen.go -package=mocks
+
+type URLService interface {
+	SetShortURL(fullURL string) (string, error)
+}
+
 type Handler struct {
-	service             service.Service
+	service             URLService
 	defaultShortAddress string
 }
 
-func NewShortenURLHandler(service service.Service, defaultShortAddress string) Handler {
+func NewShortenURLHandler(service URLService, defaultShortAddress string) Handler {
 	return Handler{service: service, defaultShortAddress: defaultShortAddress}
 }
 

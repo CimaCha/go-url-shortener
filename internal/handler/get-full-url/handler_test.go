@@ -1,87 +1,83 @@
 package fullurl
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/CimaCha/go-url-shortener/internal/repository"
+	"github.com/CimaCha/go-url-shortener/internal/handler/get-full-url/mocks"
 	"github.com/CimaCha/go-url-shortener/internal/service"
-	"github.com/CimaCha/go-url-shortener/internal/service/mocks"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
 
-var errHandlerStorage = errors.New("storage error")
+var errHandlerService = errors.New("service error")
 
-func TestGetFullUrlHandler(t *testing.T) {
+func TestGetFullURLHandler(t *testing.T) {
 	tests := []struct {
 		name         string
-		method       string
 		shortURL     string
-		setup        func(*mocks.MockURLStorage)
+		setup        func(*mocks.MockURLService)
 		wantStatus   int
+		wantBody     string
 		wantLocation string
 	}{
-		{name: "method not allowed", method: http.MethodPost, shortURL: "short", wantStatus: http.StatusMethodNotAllowed},
 		{
 			name:     "stored URL",
-			method:   http.MethodGet,
 			shortURL: "short",
-			setup: func(storage *mocks.MockURLStorage) {
-				storage.EXPECT().GetFullURL("short").Return("https://example.com/path", nil)
+			setup: func(urlService *mocks.MockURLService) {
+				urlService.EXPECT().GetFullURL("short").Return("https://example.com/path", nil)
 			},
 			wantStatus:   http.StatusTemporaryRedirect,
 			wantLocation: "https://example.com/path",
 		},
 		{
 			name:     "missing URL",
-			method:   http.MethodGet,
 			shortURL: "missing",
-			setup: func(storage *mocks.MockURLStorage) {
-				storage.EXPECT().GetFullURL("missing").Return("", repository.ErrURLNotFound)
+			setup: func(urlService *mocks.MockURLService) {
+				urlService.EXPECT().GetFullURL("missing").Return("", service.ErrURLNotFound)
 			},
 			wantStatus: http.StatusNotFound,
+			wantBody:   "URL not found\n",
 		},
 		{
-			name:     "redirects URL as stored",
-			method:   http.MethodGet,
-			shortURL: "short",
-			setup: func(storage *mocks.MockURLStorage) {
-				storage.EXPECT().GetFullURL("short").Return("%", nil)
+			name: "empty URL",
+			setup: func(urlService *mocks.MockURLService) {
+				urlService.EXPECT().GetFullURL("").Return("", service.ErrEmptyURL)
 			},
-			wantStatus:   http.StatusTemporaryRedirect,
-			wantLocation: "%",
+			wantStatus: http.StatusBadRequest,
+			wantBody:   "empty URL\n",
 		},
 		{
-			name:     "storage error",
-			method:   http.MethodGet,
+			name:     "service error",
 			shortURL: "short",
-			setup: func(storage *mocks.MockURLStorage) {
-				storage.EXPECT().GetFullURL("short").Return("", errHandlerStorage)
+			setup: func(urlService *mocks.MockURLService) {
+				urlService.EXPECT().GetFullURL("short").Return("", errHandlerService)
 			},
 			wantStatus: http.StatusInternalServerError,
+			wantBody:   "Internal Server Error\n",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			controller := gomock.NewController(t)
-			storage := mocks.NewMockURLStorage(controller)
-			if tt.setup != nil {
-				tt.setup(storage)
-			}
-			handler := NewGetFullURLHandler(service.NewService(storage))
-			router := chi.NewRouter()
-			router.Method(http.MethodGet, "/{id}", handler)
-			request := httptest.NewRequest(tt.method, "/"+tt.shortURL, nil)
+			urlService := mocks.NewMockURLService(controller)
+			tt.setup(urlService)
+			handler := NewGetFullURLHandler(urlService)
+			request := httptest.NewRequest(http.MethodGet, "/"+tt.shortURL, nil)
+			routeContext := chi.NewRouteContext()
+			routeContext.URLParams.Add("id", tt.shortURL)
+			request = request.WithContext(context.WithValue(request.Context(), chi.RouteCtxKey, routeContext))
 			response := httptest.NewRecorder()
 
-			router.ServeHTTP(response, request)
+			handler.ServeHTTP(response, request)
 
 			assert.Equal(t, tt.wantStatus, response.Code)
+			assert.Equal(t, tt.wantBody, response.Body.String())
 			assert.Equal(t, tt.wantLocation, response.Header().Get("Location"))
 		})
 	}
