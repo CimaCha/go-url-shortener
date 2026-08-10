@@ -7,7 +7,7 @@ import (
 
 var (
 	ErrURLNotFound    = errors.New("URL not found")
-	ErrShortURLExists = errors.New("Short URL already exists")
+	ErrShortURLExists = errors.New("short URL already exists")
 )
 
 type MemoryURLStorage struct {
