@@ -33,12 +33,12 @@ func main() {
 	logger.Log.Info("basic address for short url", zap.String("basic url", cfg.BasicShortenAddress))
 
 	storage := repository.NewMemoryURLStorage()
-	shortenUrlService := service.NewService(storage)
+	shortenURLService := service.NewService(storage)
 
-	shortenUrlHandler := shortenurl.NewShortenURLHandler(shortenUrlService, cfg.BasicShortenAddress)
-	getFullUrlHandler := fullurl.NewGetFullURLHandler(shortenUrlService)
+	shortenURLHandler := shortenurl.NewShortenURLHandler(shortenURLService, cfg.BasicShortenAddress)
+	getFullURLHandler := fullurl.NewGetFullURLHandler(shortenURLService)
 
-	router := shortenerrouter.New(shortenUrlHandler, getFullUrlHandler)
+	router := shortenerrouter.New(shortenURLHandler, getFullURLHandler)
 
 	err = http.ListenAndServe(cfg.Address, router)
 	if err != nil {

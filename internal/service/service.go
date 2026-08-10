@@ -42,11 +42,11 @@ func (s Service) SetShortURL(fullURL string) (string, error) {
 	return "", ErrUniqueShortURL
 }
 
-func (s Service) GetFullURL(shortUrl string) (string, error) {
-	if shortUrl == "" {
+func (s Service) GetFullURL(shortURL string) (string, error) {
+	if shortURL == "" {
 		return "", ErrEmptyURL
 	}
-	fullURL, err := s.storage.GetFullURL(shortUrl)
+	fullURL, err := s.storage.GetFullURL(shortURL)
 	if err != nil {
 		if errors.Is(err, repository.ErrURLNotFound) {
 			return "", ErrURLNotFound
