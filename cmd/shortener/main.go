@@ -22,12 +22,12 @@ func main() {
 	log.Printf("basic address for short url is: %s\n", cfg.BasicShortenAddress)
 
 	storage := repository.NewMemoryURLStorage()
-	shortenUrlService := service.NewService(storage)
+	shortenURLService := service.NewService(storage)
 
-	shortenUrlHandler := shortenurl.NewShortenURLHandler(shortenUrlService, cfg.BasicShortenAddress)
-	getFullUrlHandler := fullurl.NewGetFullURLHandler(shortenUrlService)
+	shortenURLHandler := shortenurl.NewShortenURLHandler(shortenURLService, cfg.BasicShortenAddress)
+	getFullURLHandler := fullurl.NewGetFullURLHandler(shortenURLService)
 
-	router := shortenerrouter.New(shortenUrlHandler, getFullUrlHandler)
+	router := shortenerrouter.New(shortenURLHandler, getFullURLHandler)
 
 	log.Fatal(http.ListenAndServe(cfg.Address, router))
 }
