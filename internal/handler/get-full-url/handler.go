@@ -8,7 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-//go:generate mockgen -source=handler.go -destination=mocks/mock_url_service.gen.go -package=mocks
+//go:generate mockgen -source=handler.go -destination=mocks/mock_url_handler.gen.go -package=mocks
 
 type URLService interface {
 	GetFullURL(shortURL string) (string, error)
