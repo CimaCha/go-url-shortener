@@ -2,7 +2,6 @@ package shortenurl
 
 import (
 	"errors"
-	"github.com/CimaCha/go-url-shortener/internal/config/flag"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -72,8 +71,7 @@ func TestShortenUrlHandler(t *testing.T) {
 			if tt.setup != nil {
 				tt.setup(storage)
 			}
-			shortAddress := flag.NewNetAddress("http://localhost:8080")
-			handler := NewShortenURLHandler(service.NewService(storage), *shortAddress)
+			handler := NewShortenURLHandler(service.NewService(storage), "http://localhost:8080")
 			router := chi.NewRouter()
 			router.With(middleware.AllowContentType("text/plain")).
 				Method(http.MethodPost, "/", handler)
