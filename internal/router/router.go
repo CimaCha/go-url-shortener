@@ -8,11 +8,13 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-func New(shortenURLHandler, getFullURLHandler http.Handler) http.Handler {
+func New(shortenURLHandler, apiShortenURLHandler, getFullURLHandler http.Handler) http.Handler {
 	router := chi.NewRouter()
 	router.Use(logger.RequestLogger)
 	router.With(middleware.AllowContentType("text/plain")).
 		Method(http.MethodPost, "/", shortenURLHandler)
+	router.With(middleware.AllowContentType("application/json")).
+		Method(http.MethodPost, "/api/shorten", apiShortenURLHandler)
 	router.Method(http.MethodGet, "/{id}", getFullURLHandler)
 	return router
 }

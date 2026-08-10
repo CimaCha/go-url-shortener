@@ -1,6 +1,7 @@
 package main
 
 import (
+	apishortenurl "github.com/CimaCha/go-url-shortener/internal/handler/post-api-shorten-url"
 	"net/http"
 	"os"
 
@@ -36,9 +37,13 @@ func main() {
 	shortenUrlService := service.NewService(storage)
 
 	shortenUrlHandler := shortenurl.NewShortenURLHandler(shortenUrlService, cfg.BasicShortenAddress)
+	apiShortenUrlHandler := apishortenurl.NewApiShortenURLHandler(shortenUrlService, cfg.BasicShortenAddress)
 	getFullUrlHandler := fullurl.NewGetFullURLHandler(shortenUrlService)
 
-	router := shortenerrouter.New(shortenUrlHandler, getFullUrlHandler)
+	router := shortenerrouter.New(
+		shortenUrlHandler,
+		apiShortenUrlHandler,
+		getFullUrlHandler)
 
 	err = http.ListenAndServe(cfg.Address, router)
 	if err != nil {

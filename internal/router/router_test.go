@@ -22,6 +22,8 @@ func TestRouter(t *testing.T) {
 	}{
 		{name: "shorten URL", method: http.MethodPost, path: "/", contentType: "text/plain", wantStatus: http.StatusCreated, wantHandler: "shorten"},
 		{name: "unsupported content type", method: http.MethodPost, path: "/", contentType: "application/json", wantStatus: http.StatusUnsupportedMediaType},
+		{name: "shorten URL through API", method: http.MethodPost, path: "/api/shorten", contentType: "application/json", wantStatus: http.StatusCreated, wantHandler: "api-shorten"},
+		{name: "unsupported API content type", method: http.MethodPost, path: "/api/shorten", contentType: "text/plain", wantStatus: http.StatusUnsupportedMediaType},
 		{name: "get full URL", method: http.MethodGet, path: "/short", wantStatus: http.StatusTemporaryRedirect, wantHandler: "full", wantID: "short"},
 		{name: "method not allowed", method: http.MethodPut, path: "/", wantStatus: http.StatusMethodNotAllowed},
 	}
@@ -34,12 +36,16 @@ func TestRouter(t *testing.T) {
 				gotHandler = "shorten"
 				res.WriteHeader(http.StatusCreated)
 			})
+			apiShortenURLHandler := http.HandlerFunc(func(res http.ResponseWriter, _ *http.Request) {
+				gotHandler = "api-shorten"
+				res.WriteHeader(http.StatusCreated)
+			})
 			getFullURLHandler := http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 				gotHandler = "full"
 				gotID = chi.URLParam(req, "id")
 				res.WriteHeader(http.StatusTemporaryRedirect)
 			})
-			router := New(shortenURLHandler, getFullURLHandler)
+			router := New(shortenURLHandler, apiShortenURLHandler, getFullURLHandler)
 			request := httptest.NewRequest(tt.method, tt.path, strings.NewReader("https://example.com"))
 			request.Header.Set("Content-Type", tt.contentType)
 			response := httptest.NewRecorder()
