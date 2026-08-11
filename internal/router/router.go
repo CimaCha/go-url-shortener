@@ -1,6 +1,7 @@
 package router
 
 import (
+	"github.com/CimaCha/go-url-shortener/internal/encryption"
 	"github.com/CimaCha/go-url-shortener/internal/logger"
 	"net/http"
 
@@ -11,6 +12,7 @@ import (
 func New(shortenURLHandler, apiShortenURLHandler, getFullURLHandler http.Handler) http.Handler {
 	router := chi.NewRouter()
 	router.Use(logger.RequestLogger)
+	router.Use(encryption.GzipMiddleware)
 	router.With(middleware.AllowContentType("text/plain")).
 		Method(http.MethodPost, "/", shortenURLHandler)
 	router.With(middleware.AllowContentType("application/json")).
