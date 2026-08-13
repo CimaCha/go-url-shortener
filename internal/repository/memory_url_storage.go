@@ -16,8 +16,7 @@ type MemoryURLStorage struct {
 }
 
 func NewMemoryURLStorage() *MemoryURLStorage {
-	urls := map[string]string{}
-	return &MemoryURLStorage{urls: urls}
+	return &MemoryURLStorage{urls: make(map[string]string)}
 }
 
 func (s *MemoryURLStorage) SetShortURL(shortURL string, fullURL string) error {
