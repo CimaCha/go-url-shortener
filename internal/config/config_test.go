@@ -15,16 +15,18 @@ func TestNew(t *testing.T) {
 	})
 
 	tests := []struct {
-		name        string
-		args        []string
-		envAddress  string
-		envBaseURL  string
-		wantAddress string
-		wantBaseURL string
+		name         string
+		args         []string
+		envAddress   string
+		envBaseURL   string
+		envFilePath  string
+		wantAddress  string
+		wantBaseURL  string
+		wantFilePath string
 	}{
-		{name: "defaults", wantAddress: "localhost:8080", wantBaseURL: "http://localhost:8080"},
-		{name: "flags", args: []string{"-a", "cli:8080", "-b", "http://cli:8080"}, wantAddress: "cli:8080", wantBaseURL: "http://cli:8080"},
-		{name: "environment overrides flags", args: []string{"-a", "cli:8080", "-b", "http://cli:8080"}, envAddress: "env:9090", envBaseURL: "http://env:9090", wantAddress: "env:9090", wantBaseURL: "http://env:9090"},
+		{name: "defaults", wantAddress: "localhost:8080", wantBaseURL: "http://localhost:8080", wantFilePath: "./storage.json"},
+		{name: "flags", args: []string{"-a", "cli:8080", "-b", "http://cli:8080", "-f", "/tmp/cli-storage.json"}, wantAddress: "cli:8080", wantBaseURL: "http://cli:8080", wantFilePath: "/tmp/cli-storage.json"},
+		{name: "environment overrides flags", args: []string{"-a", "cli:8080", "-b", "http://cli:8080", "-f", "/tmp/cli-storage.json"}, envAddress: "env:9090", envBaseURL: "http://env:9090", envFilePath: "/tmp/env-storage.json", wantAddress: "env:9090", wantBaseURL: "http://env:9090", wantFilePath: "/tmp/env-storage.json"},
 	}
 
 	for _, tt := range tests {
@@ -34,6 +36,7 @@ func TestNew(t *testing.T) {
 			os.Args = append([]string{"shortener"}, tt.args...)
 			t.Setenv("SERVER_ADDRESS", tt.envAddress)
 			t.Setenv("BASE_URL", tt.envBaseURL)
+			t.Setenv("FILE_STORAGE_PATH", tt.envFilePath)
 
 			cfg, err := New()
 			if err != nil {
@@ -44,6 +47,9 @@ func TestNew(t *testing.T) {
 			}
 			if cfg.BasicShortenAddress != tt.wantBaseURL {
 				t.Errorf("BasicShortenAddress = %q, want %q", cfg.BasicShortenAddress, tt.wantBaseURL)
+			}
+			if cfg.FilePath != tt.wantFilePath {
+				t.Errorf("FilePath = %q, want %q", cfg.FilePath, tt.wantFilePath)
 			}
 		})
 	}

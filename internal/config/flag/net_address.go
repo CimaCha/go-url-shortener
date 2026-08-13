@@ -9,10 +9,6 @@ type NetAddress struct {
 	URL string
 }
 
-func NewNetAddress(url string) *NetAddress {
-	return &NetAddress{URL: url}
-}
-
 func NewNetAddressFlag(flagName string, flagUsage string, defaultURL string) *NetAddress {
 	netAddress := NetAddress{
 		URL: defaultURL,

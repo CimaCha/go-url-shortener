@@ -10,12 +10,14 @@ import (
 type Config struct {
 	Address             string `env:"SERVER_ADDRESS"`
 	BasicShortenAddress string `env:"BASE_URL"`
+	FilePath            string `env:"FILE_STORAGE_PATH"`
 }
 
 func New() (*Config, error) {
 
 	netAddress := configflag.NewNetAddressFlag("a", "address of service", "localhost:8080")
 	basicShortenAddress := configflag.NewNetAddressFlag("b", "basic address for short url", "http://localhost:8080")
+	filePath := configflag.NewFilePathFlag("f", "path to the storage file", "./storage.json")
 	flag.Parse()
 
 	var config Config
@@ -28,6 +30,9 @@ func New() (*Config, error) {
 	}
 	if config.BasicShortenAddress == "" {
 		config.BasicShortenAddress = basicShortenAddress.String()
+	}
+	if config.FilePath == "" {
+		config.FilePath = filePath.String()
 	}
 
 	return &config, nil
