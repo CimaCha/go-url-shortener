@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"maps"
 	"sync"
 )
 
@@ -15,8 +16,8 @@ type MemoryURLStorage struct {
 	urls map[string]string
 }
 
-func NewMemoryURLStorage() *MemoryURLStorage {
-	return &MemoryURLStorage{urls: make(map[string]string)}
+func NewMemoryURLStorage(urls map[string]string) *MemoryURLStorage {
+	return &MemoryURLStorage{urls: urls}
 }
 
 func (s *MemoryURLStorage) SetShortURL(shortURL string, fullURL string) error {
@@ -40,4 +41,11 @@ func (s *MemoryURLStorage) GetFullURL(shortURL string) (string, error) {
 	}
 
 	return fullURL, nil
+}
+
+func (s *MemoryURLStorage) Snapshot() map[string]string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return maps.Clone(s.urls)
 }

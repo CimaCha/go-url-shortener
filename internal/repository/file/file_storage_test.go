@@ -8,11 +8,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"reflect"
 	"sync"
 	"testing"
 
 	"github.com/CimaCha/go-url-shortener/internal/model"
+	"github.com/CimaCha/go-url-shortener/internal/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -20,20 +20,19 @@ import (
 
 func TestNewFileStorage(t *testing.T) {
 	tests := []struct {
-		name         string
-		filename     func(*testing.T) string
-		content      []*model.FileRecord
-		rawContent   string
-		want         map[string]string
-		wantNextUUID int
-		wantErr      error
+		name       string
+		filename   func(*testing.T) string
+		content    []*model.FileRecord
+		rawContent string
+		want       map[string]string
+		wantErr    error
 	}{
 		{
 			name:    "returns open error for missing file",
 			wantErr: ErrOpenFile,
 		},
 		{
-			name: "loads records and continues UUID sequence",
+			name: "loads records",
 			content: []*model.FileRecord{
 				{UUID: "1", ShortURL: "first", OriginalURL: "https://first.example"},
 				{UUID: "4", ShortURL: "second", OriginalURL: "https://second.example"},
@@ -42,47 +41,11 @@ func TestNewFileStorage(t *testing.T) {
 				"first":  "https://first.example",
 				"second": "https://second.example",
 			},
-			wantNextUUID: 5,
 		},
 		{
-			name: "advances after UUID equal to initial next UUID",
-			content: []*model.FileRecord{
-				{UUID: "1", ShortURL: "first", OriginalURL: "https://first.example"},
-			},
-			want: map[string]string{
-				"first": "https://first.example",
-			},
-			wantNextUUID: 2,
-		},
-		{
-			name: "ignores nonnumeric UUID after maximum",
-			content: []*model.FileRecord{
-				{UUID: "4", ShortURL: "numeric", OriginalURL: "https://numeric.example"},
-				{UUID: "invalid", ShortURL: "legacy", OriginalURL: "https://legacy.example"},
-			},
-			want: map[string]string{
-				"numeric": "https://numeric.example",
-				"legacy":  "https://legacy.example",
-			},
-			wantNextUUID: 5,
-		},
-		{
-			name: "does not decrease next UUID after smaller numeric value",
-			content: []*model.FileRecord{
-				{UUID: "4", ShortURL: "fourth", OriginalURL: "https://fourth.example"},
-				{UUID: "2", ShortURL: "second", OriginalURL: "https://second.example"},
-			},
-			want: map[string]string{
-				"fourth": "https://fourth.example",
-				"second": "https://second.example",
-			},
-			wantNextUUID: 5,
-		},
-		{
-			name:         "returns read error for malformed JSON",
-			rawContent:   "not-json\n",
-			wantErr:      ErrDecodeRecords,
-			wantNextUUID: 0,
+			name:       "returns read error for malformed JSON",
+			rawContent: "not-json\n",
+			wantErr:    ErrDecodeRecords,
 		},
 		{
 			name: "returns open error for missing parent directory",
@@ -119,18 +82,17 @@ func TestNewFileStorage(t *testing.T) {
 				assert.Equal(t, wantFullURL, got)
 			}
 			_, getErr := storage.GetFullURL("missing")
-			assert.ErrorIs(t, getErr, ErrURLNotFound)
-			assert.Equal(t, tt.wantNextUUID, storage.nextUUID)
+			assert.ErrorIs(t, getErr, repository.ErrURLNotFound)
 		})
 	}
 }
 
 func TestStorageSetShortURL(t *testing.T) {
 	tests := []struct {
-		name        string
-		writes      [][2]string
-		wantSetErr  error
-		wantRecords []*model.FileRecord
+		name       string
+		writes     [][2]string
+		wantSetErr error
+		wantURLs   map[string]string
 	}{
 		{
 			name: "persists successive writes",
@@ -138,9 +100,9 @@ func TestStorageSetShortURL(t *testing.T) {
 				{"first", "https://first.example"},
 				{"second", "https://second.example"},
 			},
-			wantRecords: []*model.FileRecord{
-				{UUID: "1", ShortURL: "first", OriginalURL: "https://first.example"},
-				{UUID: "2", ShortURL: "second", OriginalURL: "https://second.example"},
+			wantURLs: map[string]string{
+				"first":  "https://first.example",
+				"second": "https://second.example",
 			},
 		},
 		{
@@ -149,9 +111,9 @@ func TestStorageSetShortURL(t *testing.T) {
 				{"short", "https://first.example"},
 				{"short", "https://second.example"},
 			},
-			wantSetErr: ErrShortURLExists,
-			wantRecords: []*model.FileRecord{
-				{UUID: "1", ShortURL: "short", OriginalURL: "https://first.example"},
+			wantSetErr: repository.ErrShortURLExists,
+			wantURLs: map[string]string{
+				"short": "https://first.example",
 			},
 		},
 	}
@@ -171,7 +133,11 @@ func TestStorageSetShortURL(t *testing.T) {
 			assert.ErrorIs(t, setErr, tt.wantSetErr)
 			snapshots := readSnapshots(t, filename)
 			require.Len(t, snapshots, 1)
-			assert.Equal(t, tt.wantRecords, snapshots[len(snapshots)-1])
+			gotURLs := make(map[string]string, len(snapshots[0]))
+			for _, record := range snapshots[0] {
+				gotURLs[record.ShortURL] = record.OriginalURL
+			}
+			assert.Equal(t, tt.wantURLs, gotURLs)
 			assertJSONLines(t, filename, 1)
 		})
 	}
@@ -181,7 +147,7 @@ func TestStorageSetShortURLWriteFailure(t *testing.T) {
 	tests := []struct {
 		name string
 	}{
-		{name: "write error keeps added record in memory and UUID unchanged"},
+		{name: "write error keeps added record in memory"},
 	}
 
 	for _, tt := range tests {
@@ -191,7 +157,6 @@ func TestStorageSetShortURLWriteFailure(t *testing.T) {
 			require.NoError(t, os.WriteFile(filename, nil, 0o600))
 			storage, err := NewFileStorage(zap.NewNop(), filename)
 			require.NoError(t, err)
-			beforeUUID := storage.nextUUID
 			storage.writer = NewWriter(zap.NewNop(), filepath.Join(root, "missing", "storage.json"))
 
 			err = storage.SetShortURL("short", "https://example.com")
@@ -200,7 +165,6 @@ func TestStorageSetShortURLWriteFailure(t *testing.T) {
 			got, getErr := storage.GetFullURL("short")
 			require.NoError(t, getErr)
 			assert.Equal(t, "https://example.com", got)
-			assert.Equal(t, beforeUUID, storage.nextUUID)
 		})
 	}
 }
@@ -278,39 +242,7 @@ func TestStorageUsesMemoryAsSourceOfTruth(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, "https://first.example", got)
 			_, err = storage.GetFullURL("external")
-			assert.ErrorIs(t, err, ErrURLNotFound)
-		})
-	}
-}
-
-func TestStorageStructure(t *testing.T) {
-	tests := []struct {
-		name       string
-		wantFields []string
-	}{
-		{
-			name:       "retains writer lock records and next UUID",
-			wantFields: []string{"logger", "writer", "mu", "urls", "nextUUID"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			storageType := reflect.TypeOf(Storage{})
-			fields := make([]string, 0, storageType.NumField())
-			for index := range storageType.NumField() {
-				fields = append(fields, storageType.Field(index).Name)
-			}
-			assert.Equal(t, tt.wantFields, fields)
-
-			urlsField, ok := storageType.FieldByName("urls")
-			require.True(t, ok)
-			assert.Equal(t, reflect.TypeOf(map[string]*model.FileRecord{}), urlsField.Type)
-
-			writerType := reflect.TypeOf(Writer{})
-			require.Equal(t, 2, writerType.NumField())
-			assert.Equal(t, "logger", writerType.Field(0).Name)
-			assert.Equal(t, "filename", writerType.Field(1).Name)
+			assert.ErrorIs(t, err, repository.ErrURLNotFound)
 		})
 	}
 }

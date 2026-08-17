@@ -42,7 +42,7 @@ func TestMemoryURLStorage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			storage := NewMemoryURLStorage()
+			storage := NewMemoryURLStorage(make(map[string]string))
 			var setErr error
 			for _, write := range tt.writes {
 				setErr = storage.SetShortURL(write[0], write[1])
@@ -67,7 +67,7 @@ func TestMemoryURLStorageConcurrentSet(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			storage := NewMemoryURLStorage()
+			storage := NewMemoryURLStorage(make(map[string]string))
 			start := make(chan struct{})
 			successes := make(chan string, tt.workers)
 			var wg sync.WaitGroup
@@ -101,4 +101,16 @@ func TestMemoryURLStorageConcurrentSet(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMemoryURLStorageSnapshot(t *testing.T) {
+	storage := NewMemoryURLStorage(make(map[string]string))
+	assert.NoError(t, storage.SetShortURL("short", "https://example.com"))
+
+	snapshot := storage.Snapshot()
+	snapshot["short"] = "changed"
+
+	got, err := storage.GetFullURL("short")
+	assert.NoError(t, err)
+	assert.Equal(t, "https://example.com", got)
 }

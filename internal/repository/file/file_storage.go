@@ -1,28 +1,20 @@
 package file
 
 import (
-	"errors"
 	"fmt"
-	"go.uber.org/zap"
-	"maps"
-	"slices"
 	"strconv"
 	"sync"
 
 	"github.com/CimaCha/go-url-shortener/internal/model"
-)
-
-var (
-	ErrURLNotFound    = errors.New("URL not found")
-	ErrShortURLExists = errors.New("short URL already exists")
+	"github.com/CimaCha/go-url-shortener/internal/repository"
+	"go.uber.org/zap"
 )
 
 type Storage struct {
-	logger   *zap.Logger
-	writer   *Writer
-	mu       sync.RWMutex
-	urls     map[string]*model.FileRecord
-	nextUUID int
+	logger *zap.Logger
+	memory *repository.MemoryURLStorage
+	writer *Writer
+	mu     sync.Mutex
 }
 
 func NewFileStorage(logger *zap.Logger, filePath string) (*Storage, error) {
@@ -39,20 +31,16 @@ func NewFileStorage(logger *zap.Logger, filePath string) (*Storage, error) {
 		return nil, fmt.Errorf("close storage reader: %w", closeErr)
 	}
 
-	urls := make(map[string]*model.FileRecord, len(records))
-	nextUUID := 1
+	urls := make(map[string]string, len(records))
 	for _, record := range records {
-		urls[record.ShortURL] = record
-		if uuid, parseErr := strconv.Atoi(record.UUID); parseErr == nil && uuid >= nextUUID {
-			nextUUID = uuid + 1
-		}
+		urls[record.ShortURL] = record.OriginalURL
 	}
+	memory := repository.NewMemoryURLStorage(urls)
 
 	return &Storage{
-		logger:   logger,
-		writer:   NewWriter(logger.With(zap.String("file worker", "writer")), filePath),
-		urls:     urls,
-		nextUUID: nextUUID,
+		logger: logger,
+		memory: memory,
+		writer: NewWriter(logger.With(zap.String("file worker", "writer")), filePath),
 	}, nil
 }
 
@@ -60,31 +48,29 @@ func (f *Storage) SetShortURL(shortURL string, fullURL string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	if _, exists := f.urls[shortURL]; exists {
-		return ErrShortURLExists
+	if err := f.memory.SetShortURL(shortURL, fullURL); err != nil {
+		return err
 	}
 
-	record := model.FileRecord{
-		UUID:        strconv.Itoa(f.nextUUID),
-		ShortURL:    shortURL,
-		OriginalURL: fullURL,
+	urls := f.memory.Snapshot()
+	records := make([]*model.FileRecord, 0, len(urls))
+	uuid := 0
+	for currentShortURL, currentFullURL := range urls {
+		records = append(records, &model.FileRecord{
+			UUID:        strconv.Itoa(uuid),
+			ShortURL:    currentShortURL,
+			OriginalURL: currentFullURL,
+		})
+		uuid++
 	}
 
-	f.urls[shortURL] = &record
-	if err := f.writer.WriteRecords(slices.Collect(maps.Values(f.urls))); err != nil {
+	if err := f.writer.WriteRecords(records); err != nil {
+		f.logger.Error("can't persist short URL", zap.Error(err))
 		return fmt.Errorf("persist short URL: %w", err)
 	}
-	f.nextUUID++
 	return nil
 }
 
 func (f *Storage) GetFullURL(shortURL string) (string, error) {
-	f.mu.RLock()
-	defer f.mu.RUnlock()
-
-	record, exists := f.urls[shortURL]
-	if !exists {
-		return "", ErrURLNotFound
-	}
-	return record.OriginalURL, nil
+	return f.memory.GetFullURL(shortURL)
 }
