@@ -11,7 +11,6 @@ import (
 	"github.com/CimaCha/go-url-shortener/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 )
 
 func TestWriterWriteRecords(t *testing.T) {
@@ -82,7 +81,7 @@ func TestWriterWriteRecords(t *testing.T) {
 			} else if tt.create {
 				require.NoError(t, os.WriteFile(filename, nil, 0o600))
 			}
-			writer := NewWriter(zap.NewNop(), filename)
+			writer := NewWriter(filename)
 
 			err := writer.WriteRecords(tt.records)
 
@@ -116,7 +115,7 @@ func TestWriterAtomicallyReplacesFile(t *testing.T) {
 	defer oldFile.Close()
 
 	newRecords := []*model.FileRecord{{UUID: "2", ShortURL: "new", OriginalURL: "https://new.example"}}
-	if err = NewWriter(zap.NewNop(), filename).WriteRecords(newRecords); err != nil {
+	if err = NewWriter(filename).WriteRecords(newRecords); err != nil {
 		t.Fatal(err)
 	}
 

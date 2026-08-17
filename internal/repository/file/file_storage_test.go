@@ -13,7 +13,6 @@ import (
 	"github.com/CimaCha/go-url-shortener/internal/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 )
 
 func TestNewFileStorage(t *testing.T) {
@@ -62,7 +61,7 @@ func TestNewFileStorage(t *testing.T) {
 				require.NoError(t, os.WriteFile(filename, []byte(tt.rawContent), 0o600))
 			}
 
-			storage, err := NewFileStorage(zap.NewNop(), filename)
+			storage, err := NewFileStorage(filename)
 
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
@@ -116,7 +115,7 @@ func TestStorageSetShortURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			filename := filepath.Join(t.TempDir(), "storage.json")
 			require.NoError(t, os.WriteFile(filename, nil, 0o600))
-			storage, err := NewFileStorage(zap.NewNop(), filename)
+			storage, err := NewFileStorage(filename)
 			require.NoError(t, err)
 
 			var setErr error
@@ -149,9 +148,9 @@ func TestStorageSetShortURLWriteFailure(t *testing.T) {
 			root := t.TempDir()
 			filename := filepath.Join(root, "storage.json")
 			require.NoError(t, os.WriteFile(filename, nil, 0o600))
-			storage, err := NewFileStorage(zap.NewNop(), filename)
+			storage, err := NewFileStorage(filename)
 			require.NoError(t, err)
-			storage.writer = NewWriter(zap.NewNop(), filepath.Join(root, "missing", "storage.json"))
+			storage.writer = NewWriter(filepath.Join(root, "missing", "storage.json"))
 
 			err = storage.SetShortURL("short", "https://example.com")
 
@@ -176,7 +175,7 @@ func TestStorageUsesMemoryAsSourceOfTruth(t *testing.T) {
 			writeRecords(t, filename, []*model.FileRecord{
 				{UUID: "1", ShortURL: "first", OriginalURL: "https://first.example"},
 			})
-			storage, err := NewFileStorage(zap.NewNop(), filename)
+			storage, err := NewFileStorage(filename)
 			require.NoError(t, err)
 			writeRecords(t, filename, []*model.FileRecord{
 				{UUID: "99", ShortURL: "external", OriginalURL: "https://external.example"},

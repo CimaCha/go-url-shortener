@@ -21,7 +21,7 @@ type Handler struct {
 	defaultShortAddress string
 }
 
-func NewApiShortenURLHandler(service URLService, defaultShortAddress string) Handler {
+func NewAPIShortenURLHandler(service URLService, defaultShortAddress string) Handler {
 	return Handler{service: service, defaultShortAddress: defaultShortAddress}
 }
 

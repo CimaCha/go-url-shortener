@@ -87,7 +87,7 @@ func TestAPIShortenURLHandler(t *testing.T) {
 			if tt.setup != nil {
 				tt.setup(urlService)
 			}
-			handler := NewApiShortenURLHandler(urlService, "http://localhost:8080")
+			handler := NewAPIShortenURLHandler(urlService, "http://localhost:8080")
 			var body io.Reader = strings.NewReader(tt.body)
 			if tt.readError {
 				body = errorReader{}

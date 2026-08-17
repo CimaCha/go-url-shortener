@@ -50,7 +50,7 @@ func run() error {
 	shortenURLService := service.NewService(fileStorage)
 
 	shortenURLHandler := shortenurl.NewShortenURLHandler(shortenURLService, cfg.BasicShortenAddress)
-	apiShortenURLHandler := apishortenurl.NewApiShortenURLHandler(shortenURLService, cfg.BasicShortenAddress)
+	apiShortenURLHandler := apishortenurl.NewAPIShortenURLHandler(shortenURLService, cfg.BasicShortenAddress)
 	getFullURLHandler := fullurl.NewGetFullURLHandler(shortenURLService)
 
 	router := shortenerrouter.New(
