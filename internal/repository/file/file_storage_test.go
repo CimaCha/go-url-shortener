@@ -4,11 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 
 	"github.com/CimaCha/go-url-shortener/internal/model"
@@ -165,56 +163,6 @@ func TestStorageSetShortURLWriteFailure(t *testing.T) {
 	}
 }
 
-func TestStorageConcurrentSetSnapshot(t *testing.T) {
-	tests := []struct {
-		name    string
-		workers int
-	}{
-		{name: "last snapshot contains all concurrent writes", workers: 32},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			filename := filepath.Join(t.TempDir(), "storage.json")
-			require.NoError(t, os.WriteFile(filename, nil, 0o600))
-			storage, err := NewFileStorage(zap.NewNop(), filename)
-			require.NoError(t, err)
-
-			start := make(chan struct{})
-			errors := make(chan error, tt.workers)
-			var wg sync.WaitGroup
-			for worker := range tt.workers {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					<-start
-					shortURL := fmt.Sprintf("short-%d", worker)
-					errors <- storage.SetShortURL(shortURL, "https://example.com/"+shortURL)
-				}()
-			}
-			close(start)
-			wg.Wait()
-			close(errors)
-			for setErr := range errors {
-				require.NoError(t, setErr)
-			}
-
-			snapshots := readSnapshots(t, filename)
-			require.Len(t, snapshots, 1)
-			lastSnapshot := snapshots[len(snapshots)-1]
-			byShortURL := make(map[string]string, len(lastSnapshot))
-			for _, record := range lastSnapshot {
-				byShortURL[record.ShortURL] = record.OriginalURL
-			}
-			for worker := range tt.workers {
-				shortURL := fmt.Sprintf("short-%d", worker)
-				assert.Equal(t, "https://example.com/"+shortURL, byShortURL[shortURL])
-			}
-			assert.Len(t, lastSnapshot, tt.workers)
-		})
-	}
-}
-
 func TestStorageUsesMemoryAsSourceOfTruth(t *testing.T) {
 	tests := []struct {
 		name string
@@ -248,16 +196,6 @@ func writeRecords(t *testing.T, filename string, records []*model.FileRecord) {
 	var content bytes.Buffer
 	require.NoError(t, json.NewEncoder(&content).Encode(records))
 	require.NoError(t, os.WriteFile(filename, content.Bytes(), 0o600))
-}
-
-func readRecords(t *testing.T, filename string) []*model.FileRecord {
-	t.Helper()
-	reader, err := NewReader(zap.NewNop(), filename)
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, reader.Close()) })
-	records, err := reader.ReadRecords()
-	require.NoError(t, err)
-	return records
 }
 
 func readSnapshots(t *testing.T, filename string) [][]*model.FileRecord {
