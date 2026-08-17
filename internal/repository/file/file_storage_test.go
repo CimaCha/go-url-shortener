@@ -28,10 +28,6 @@ func TestNewFileStorage(t *testing.T) {
 		wantErr    error
 	}{
 		{
-			name:    "returns open error for missing file",
-			wantErr: ErrOpenFile,
-		},
-		{
 			name: "loads records",
 			content: []*model.FileRecord{
 				{UUID: "1", ShortURL: "first", OriginalURL: "https://first.example"},

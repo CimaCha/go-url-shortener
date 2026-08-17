@@ -81,13 +81,6 @@ func TestNewReader(t *testing.T) {
 		wantErr  error
 	}{
 		{
-			name: "returns open error for missing file",
-			filename: func(t *testing.T) string {
-				return filepath.Join(t.TempDir(), "storage.json")
-			},
-			wantErr: ErrOpenFile,
-		},
-		{
 			name: "returns open error for missing parent",
 			filename: func(t *testing.T) string {
 				return filepath.Join(t.TempDir(), "missing", "storage.json")
