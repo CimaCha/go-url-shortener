@@ -9,9 +9,9 @@ type FilePath struct {
 	Path string
 }
 
-func NewFilePathFlag(flagName string, flagUsage string, defaultURL string) *FilePath {
+func NewFilePathFlag(flagName string, flagUsage string, defaultPath string) *FilePath {
 	filePath := FilePath{
-		Path: defaultURL,
+		Path: defaultPath,
 	}
 	flag.Var(&filePath, flagName, flagUsage)
 	return &filePath

@@ -22,7 +22,7 @@ type Reader struct {
 }
 
 func NewReader(log *zap.Logger, filename string) (*Reader, error) {
-	file, err := os.OpenFile(filename, os.O_RDONLY, 0666)
+	file, err := os.OpenFile(filename, os.O_RDONLY|os.O_CREATE, 0666)
 	if err != nil {
 		log.Error("error open file:", zap.Error(ErrOpenFile))
 		return nil, ErrOpenFile
