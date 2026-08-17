@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 
 	"github.com/CimaCha/go-url-shortener/internal/model"
-	"go.uber.org/zap"
 )
 
 var (
@@ -17,31 +16,26 @@ var (
 )
 
 type Writer struct {
-	logger   *zap.Logger
 	filename string
 }
 
-func NewWriter(log *zap.Logger, filename string) *Writer {
+func NewWriter(filename string) *Writer {
 	return &Writer{
-		logger:   log,
 		filename: filename,
 	}
 }
 
 func (w *Writer) WriteRecords(records []*model.FileRecord) error {
 	if records == nil {
-		w.logger.Error("write null records")
 		return ErrWriteNullRecords
 	}
 
 	info, err := os.Stat(w.filename)
 	if err != nil {
-		w.logger.Error("open file for write", zap.Error(err))
 		return ErrOpenFileForWrite
 	}
 	file, err := os.CreateTemp(filepath.Dir(w.filename), ".storage-*.tmp")
 	if err != nil {
-		w.logger.Error("open file for write", zap.Error(err))
 		return ErrOpenFileForWrite
 	}
 	temporaryName := file.Name()
@@ -54,19 +48,15 @@ func (w *Writer) WriteRecords(records []*model.FileRecord) error {
 	}
 
 	if err = json.NewEncoder(file).Encode(records); err != nil {
-		w.logger.Error("encode record", zap.Error(err))
 		return fmt.Errorf("encode record: %w", err)
 	}
 	if err = file.Sync(); err != nil {
-		w.logger.Error("sync file", zap.Error(err))
 		return fmt.Errorf("sync file: %w", err)
 	}
 	if err = file.Close(); err != nil {
-		w.logger.Error("close file", zap.Error(err))
 		return fmt.Errorf("close file: %w", err)
 	}
 	if err = os.Rename(temporaryName, w.filename); err != nil {
-		w.logger.Error("rename file", zap.Error(err))
 		return fmt.Errorf("rename file: %w", err)
 	}
 	return nil

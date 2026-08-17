@@ -7,18 +7,16 @@ import (
 
 	"github.com/CimaCha/go-url-shortener/internal/model"
 	"github.com/CimaCha/go-url-shortener/internal/repository"
-	"go.uber.org/zap"
 )
 
 type Storage struct {
-	logger *zap.Logger
 	memory *repository.MemoryURLStorage
 	writer *Writer
 	mu     sync.Mutex
 }
 
-func NewFileStorage(logger *zap.Logger, filePath string) (*Storage, error) {
-	reader, err := NewReader(logger.With(zap.String("file worker", "reader")), filePath)
+func NewFileStorage(filePath string) (*Storage, error) {
+	reader, err := NewReader(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("open storage reader: %w", err)
 	}
@@ -38,9 +36,8 @@ func NewFileStorage(logger *zap.Logger, filePath string) (*Storage, error) {
 	memory := repository.NewMemoryURLStorage(urls)
 
 	return &Storage{
-		logger: logger,
 		memory: memory,
-		writer: NewWriter(logger.With(zap.String("file worker", "writer")), filePath),
+		writer: NewWriter(filePath),
 	}, nil
 }
 
@@ -65,7 +62,6 @@ func (f *Storage) SetShortURL(shortURL string, fullURL string) error {
 	}
 
 	if err := f.writer.WriteRecords(records); err != nil {
-		f.logger.Error("can't persist short URL", zap.Error(err))
 		return fmt.Errorf("persist short URL: %w", err)
 	}
 	return nil

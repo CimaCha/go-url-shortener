@@ -42,12 +42,12 @@ func run() error {
 		return fmt.Errorf("parse config: %w", err)
 	}
 
-	fileStorage, err := file.NewFileStorage(initializedLogger.With(zap.String("storage", "file storage")), cfg.FilePath)
+	fileStorage, err := file.NewFileStorage(cfg.FilePath)
 	if err != nil {
 		initializedLogger.Error("new file storage error", zap.Error(err))
 		return fmt.Errorf("open file storage: %w", err)
 	}
-	shortenURLService := service.NewService(initializedLogger.With(zap.String("layer", "service")), fileStorage)
+	shortenURLService := service.NewService(fileStorage)
 
 	shortenURLHandler := shortenurl.NewShortenURLHandler(shortenURLService, cfg.BasicShortenAddress)
 	apiShortenURLHandler := apishortenurl.NewApiShortenURLHandler(shortenURLService, cfg.BasicShortenAddress)
