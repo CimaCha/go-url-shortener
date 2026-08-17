@@ -1,22 +1,26 @@
 package file
 
 import (
+	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/CimaCha/go-url-shortener/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestWriterWriteRecords(t *testing.T) {
 	first := []*model.FileRecord{
-		{UUID: "1", ShortUrl: "first", OriginalUrl: "https://first.example"},
+		{UUID: "1", ShortURL: "first", OriginalURL: "https://first.example"},
 	}
 	second := []*model.FileRecord{
-		{UUID: "2", ShortUrl: "second", OriginalUrl: "https://second.example"},
-		{UUID: "3", ShortUrl: "third", OriginalUrl: "https://third.example"},
+		{UUID: "2", ShortURL: "second", OriginalURL: "https://second.example"},
+		{UUID: "3", ShortURL: "third", OriginalURL: "https://third.example"},
 	}
 	tests := []struct {
 		name     string
@@ -78,7 +82,7 @@ func TestWriterWriteRecords(t *testing.T) {
 			} else if tt.create {
 				require.NoError(t, os.WriteFile(filename, nil, 0o600))
 			}
-			writer := NewWriter(filename)
+			writer := NewWriter(zap.NewNop(), filename)
 
 			err := writer.WriteRecords(tt.records)
 
@@ -90,5 +94,49 @@ func TestWriterWriteRecords(t *testing.T) {
 			assert.Equal(t, tt.want, readSnapshots(t, filename))
 			assertJSONLines(t, filename, len(tt.want))
 		})
+	}
+}
+
+func TestWriterAtomicallyReplacesFile(t *testing.T) {
+	filename := filepath.Join(t.TempDir(), "storage.json")
+	oldRecords := []*model.FileRecord{{UUID: "1", ShortURL: "old", OriginalURL: "https://old.example"}}
+	oldContent, err := json.Marshal(oldRecords)
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldContent = append(oldContent, '\n')
+	if err = os.WriteFile(filename, oldContent, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	oldFile, err := os.Open(filename)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer oldFile.Close()
+
+	newRecords := []*model.FileRecord{{UUID: "2", ShortURL: "new", OriginalURL: "https://new.example"}}
+	if err = NewWriter(zap.NewNop(), filename).WriteRecords(newRecords); err != nil {
+		t.Fatal(err)
+	}
+
+	gotOldContent, err := io.ReadAll(oldFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(gotOldContent, oldContent) {
+		t.Fatalf("open file changed: got %q, want %q", gotOldContent, oldContent)
+	}
+
+	newContent, err := os.ReadFile(filename)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var gotNewRecords []*model.FileRecord
+	if err = json.Unmarshal(newContent, &gotNewRecords); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(gotNewRecords, newRecords) {
+		t.Fatalf("replacement contains %#v, want %#v", gotNewRecords, newRecords)
 	}
 }

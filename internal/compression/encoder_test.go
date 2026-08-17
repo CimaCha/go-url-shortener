@@ -1,4 +1,4 @@
-package encryption
+package compression
 
 import (
 	"bytes"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func gzipBody(t *testing.T, body string) []byte {
@@ -131,7 +132,7 @@ func TestGzipMiddlewareRequest(t *testing.T) {
 			})
 			response := httptest.NewRecorder()
 
-			GzipMiddleware(handler).ServeHTTP(response, request)
+			GzipMiddleware(zap.NewNop())(handler).ServeHTTP(response, request)
 
 			assert.Equal(t, tt.wantStatus, response.Code)
 			assert.Equal(t, tt.wantResponseBody, response.Body.String())

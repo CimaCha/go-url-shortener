@@ -13,46 +13,35 @@ import (
 
 func TestInitialize(t *testing.T) {
 	tests := []struct {
-		name        string
-		level       string
-		wantErr     bool
-		wantChanged bool
-		wantDebug   bool
-		wantInfo    bool
-		wantError   bool
+		name      string
+		level     string
+		wantErr   bool
+		wantDebug bool
+		wantInfo  bool
+		wantError bool
 	}{
-		{name: "debug level", level: "debug", wantChanged: true, wantDebug: true, wantInfo: true, wantError: true},
-		{name: "error level", level: "error", wantChanged: true, wantError: true},
+		{name: "debug level", level: "debug", wantDebug: true, wantInfo: true, wantError: true},
+		{name: "error level", level: "error", wantError: true},
 		{name: "unknown level", level: "unknown", wantErr: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			originalLog := Log
-			t.Cleanup(func() {
-				if Log != originalLog {
-					_ = Log.Sync()
-				}
-				Log = originalLog
-			})
-
-			err := Initialize(tt.level)
+			gotLog, err := Initialize(tt.level)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("Initialize(%q) error = %v, wantErr %v", tt.level, err, tt.wantErr)
-			}
-			if got := Log != originalLog; got != tt.wantChanged {
-				t.Fatalf("logger changed = %v, want %v", got, tt.wantChanged)
 			}
 			if tt.wantErr {
 				return
 			}
-			if got := Log.Core().Enabled(zap.DebugLevel); got != tt.wantDebug {
+			t.Cleanup(func() { _ = gotLog.Sync() })
+			if got := gotLog.Core().Enabled(zap.DebugLevel); got != tt.wantDebug {
 				t.Errorf("debug enabled = %v, want %v", got, tt.wantDebug)
 			}
-			if got := Log.Core().Enabled(zap.InfoLevel); got != tt.wantInfo {
+			if got := gotLog.Core().Enabled(zap.InfoLevel); got != tt.wantInfo {
 				t.Errorf("info enabled = %v, want %v", got, tt.wantInfo)
 			}
-			if got := Log.Core().Enabled(zap.ErrorLevel); got != tt.wantError {
+			if got := gotLog.Core().Enabled(zap.ErrorLevel); got != tt.wantError {
 				t.Errorf("error enabled = %v, want %v", got, tt.wantError)
 			}
 		})
@@ -80,11 +69,9 @@ func TestRequestLogger(t *testing.T) {
 				MessageKey:     "message",
 				EncodeDuration: zapcore.NanosDurationEncoder,
 			})
-			originalLog := Log
-			Log = zap.New(zapcore.NewCore(encoder, zapcore.AddSync(&output), zap.InfoLevel))
-			t.Cleanup(func() { Log = originalLog })
+			log := zap.New(zapcore.NewCore(encoder, zapcore.AddSync(&output), zap.InfoLevel))
 
-			handler := RequestLogger(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+			handler := RequestLogger(log)(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 				if tt.status != 0 {
 					writer.WriteHeader(tt.status)
 				}

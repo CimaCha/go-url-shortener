@@ -10,6 +10,6 @@ type ShortenURLResponse struct {
 
 type FileRecord struct {
 	UUID        string `json:"uuid,omitempty"`
-	ShortUrl    string `json:"short_url,omitempty"`
-	OriginalUrl string `json:"original_url,omitempty"`
+	ShortURL    string `json:"short_url,omitempty"`
+	OriginalURL string `json:"original_url,omitempty"`
 }

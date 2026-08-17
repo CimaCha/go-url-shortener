@@ -3,6 +3,7 @@ package file
 import (
 	"errors"
 	"fmt"
+	"go.uber.org/zap"
 	"maps"
 	"slices"
 	"strconv"
@@ -17,15 +18,15 @@ var (
 )
 
 type Storage struct {
+	logger   *zap.Logger
 	writer   *Writer
 	mu       sync.RWMutex
 	urls     map[string]*model.FileRecord
-	fileUrls []*model.FileRecord
 	nextUUID int
 }
 
-func NewFileStorage(filePath string) (*Storage, error) {
-	reader, err := NewReader(filePath)
+func NewFileStorage(logger *zap.Logger, filePath string) (*Storage, error) {
+	reader, err := NewReader(logger.With(zap.String("file worker", "reader")), filePath)
 	if err != nil {
 		return nil, fmt.Errorf("open storage reader: %w", err)
 	}
@@ -41,16 +42,16 @@ func NewFileStorage(filePath string) (*Storage, error) {
 	urls := make(map[string]*model.FileRecord, len(records))
 	nextUUID := 1
 	for _, record := range records {
-		urls[record.ShortUrl] = record
+		urls[record.ShortURL] = record
 		if uuid, parseErr := strconv.Atoi(record.UUID); parseErr == nil && uuid >= nextUUID {
 			nextUUID = uuid + 1
 		}
 	}
 
 	return &Storage{
-		writer:   NewWriter(filePath),
+		logger:   logger,
+		writer:   NewWriter(logger.With(zap.String("file worker", "writer")), filePath),
 		urls:     urls,
-		fileUrls: records,
 		nextUUID: nextUUID,
 	}, nil
 }
@@ -65,8 +66,8 @@ func (f *Storage) SetShortURL(shortURL string, fullURL string) error {
 
 	record := model.FileRecord{
 		UUID:        strconv.Itoa(f.nextUUID),
-		ShortUrl:    shortURL,
-		OriginalUrl: fullURL,
+		ShortURL:    shortURL,
+		OriginalURL: fullURL,
 	}
 
 	f.urls[shortURL] = &record
@@ -85,5 +86,5 @@ func (f *Storage) GetFullURL(shortURL string) (string, error) {
 	if !exists {
 		return "", ErrURLNotFound
 	}
-	return record.OriginalUrl, nil
+	return record.OriginalURL, nil
 }

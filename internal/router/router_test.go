@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestRouter(t *testing.T) {
@@ -49,7 +50,7 @@ func TestRouter(t *testing.T) {
 				gotID = chi.URLParam(req, "id")
 				res.WriteHeader(http.StatusTemporaryRedirect)
 			})
-			router := New(shortenURLHandler, apiShortenURLHandler, getFullURLHandler)
+			router := New(zap.NewNop(), shortenURLHandler, apiShortenURLHandler, getFullURLHandler)
 			request := httptest.NewRequest(tt.method, tt.path, strings.NewReader("https://example.com"))
 			request.Header.Set("Content-Type", tt.contentType)
 			response := httptest.NewRecorder()
@@ -201,7 +202,7 @@ func TestRouterGzipMiddleware(t *testing.T) {
 				gotHandler = "full"
 				writer.WriteHeader(http.StatusTemporaryRedirect)
 			})
-			router := New(shortenURLHandler, apiShortenURLHandler, getFullURLHandler)
+			router := New(zap.NewNop(), shortenURLHandler, apiShortenURLHandler, getFullURLHandler)
 			request := httptest.NewRequest(http.MethodPost, tt.path, bytes.NewReader(tt.body(t)))
 			request.Header.Set("Content-Type", tt.contentType)
 			if tt.acceptEncoding != "" {

@@ -1,4 +1,4 @@
-package encryption
+package compression
 
 import (
 	"errors"

@@ -8,6 +8,7 @@ import (
 	"github.com/CimaCha/go-url-shortener/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestReaderReadRecords(t *testing.T) {
@@ -22,8 +23,8 @@ func TestReaderReadRecords(t *testing.T) {
 			content: `[{"uuid":"1","short_url":"first","original_url":"https://first.example"},` +
 				`{"uuid":"2","short_url":"second","original_url":"https://second.example"}]`,
 			want: []*model.FileRecord{
-				{UUID: "1", ShortUrl: "first", OriginalUrl: "https://first.example"},
-				{UUID: "2", ShortUrl: "second", OriginalUrl: "https://second.example"},
+				{UUID: "1", ShortURL: "first", OriginalURL: "https://first.example"},
+				{UUID: "2", ShortURL: "second", OriginalURL: "https://second.example"},
 			},
 		},
 		{
@@ -46,7 +47,7 @@ func TestReaderReadRecords(t *testing.T) {
 			content: `[{"uuid":"1","short_url":"first"}]` + "\n" +
 				`[{"uuid":"2","short_url":"second"}]`,
 			want: []*model.FileRecord{
-				{UUID: "1", ShortUrl: "first"},
+				{UUID: "1", ShortURL: "first"},
 			},
 		},
 	}
@@ -55,7 +56,7 @@ func TestReaderReadRecords(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			filename := filepath.Join(t.TempDir(), "storage.json")
 			require.NoError(t, os.WriteFile(filename, []byte(tt.content), 0o600))
-			reader, err := NewReader(filename)
+			reader, err := NewReader(zap.NewNop(), filename)
 			require.NoError(t, err)
 			t.Cleanup(func() { require.NoError(t, reader.Close()) })
 
@@ -80,10 +81,11 @@ func TestNewReader(t *testing.T) {
 		wantErr  error
 	}{
 		{
-			name: "creates missing file",
+			name: "returns open error for missing file",
 			filename: func(t *testing.T) string {
 				return filepath.Join(t.TempDir(), "storage.json")
 			},
+			wantErr: ErrOpenFile,
 		},
 		{
 			name: "returns open error for missing parent",
@@ -96,7 +98,7 @@ func TestNewReader(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			reader, err := NewReader(tt.filename(t))
+			reader, err := NewReader(zap.NewNop(), tt.filename(t))
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 				assert.Nil(t, reader)
@@ -117,7 +119,9 @@ func TestReaderClose(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			reader, err := NewReader(filepath.Join(t.TempDir(), "storage.json"))
+			filename := filepath.Join(t.TempDir(), "storage.json")
+			require.NoError(t, os.WriteFile(filename, nil, 0o600))
+			reader, err := NewReader(zap.NewNop(), filename)
 			require.NoError(t, err)
 			require.NoError(t, reader.Close())
 			assert.Error(t, reader.Close())

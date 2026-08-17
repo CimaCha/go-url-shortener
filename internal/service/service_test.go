@@ -8,6 +8,7 @@ import (
 	"github.com/CimaCha/go-url-shortener/internal/service/mocks"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/zap"
 )
 
 var errStorage = errors.New("storage error")
@@ -53,7 +54,7 @@ func TestServiceSetShortURL(t *testing.T) {
 				tt.setup(storage, &storedShortURL)
 			}
 
-			got, err := NewService(storage).SetShortURL(tt.fullURL)
+			got, err := NewService(zap.NewNop(), storage).SetShortURL(tt.fullURL)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 			} else {
@@ -108,7 +109,7 @@ func TestServiceGetFullURL(t *testing.T) {
 				tt.setup(storage)
 			}
 
-			got, err := NewService(storage).GetFullURL(tt.shortURL)
+			got, err := NewService(zap.NewNop(), storage).GetFullURL(tt.shortURL)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 			} else {

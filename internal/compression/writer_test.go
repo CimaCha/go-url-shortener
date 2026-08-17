@@ -1,4 +1,4 @@
-package encryption
+package compression
 
 import (
 	"bufio"
@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 var errOptionalOperation = errors.New("optional operation error")
@@ -258,7 +259,7 @@ func TestGzipMiddlewareResponse(t *testing.T) {
 			}
 			response := httptest.NewRecorder()
 
-			GzipMiddleware(handler).ServeHTTP(response, request)
+			GzipMiddleware(zap.NewNop())(handler).ServeHTTP(response, request)
 
 			wantStatus := tt.status
 			if !tt.explicitWriteHeader {
@@ -390,7 +391,7 @@ func TestGzipMiddlewareCloseErrorDoesNotPanic(t *testing.T) {
 			response := &errorResponseWriter{header: make(http.Header)}
 
 			assert.NotPanics(t, func() {
-				GzipMiddleware(handler).ServeHTTP(response, request)
+				GzipMiddleware(zap.NewNop())(handler).ServeHTTP(response, request)
 			})
 		})
 	}

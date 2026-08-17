@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/CimaCha/go-url-shortener/internal/logger"
+	"os"
+	"path/filepath"
+
 	"github.com/CimaCha/go-url-shortener/internal/model"
 	"go.uber.org/zap"
-	"os"
 )
 
 var (
@@ -16,37 +17,57 @@ var (
 )
 
 type Writer struct {
+	logger   *zap.Logger
 	filename string
 }
 
-func NewWriter(filename string) *Writer {
-	return &Writer{filename: filename}
+func NewWriter(log *zap.Logger, filename string) *Writer {
+	return &Writer{
+		logger:   log,
+		filename: filename,
+	}
 }
 
-func (w *Writer) WriteRecords(records []*model.FileRecord) (returnErr error) {
+func (w *Writer) WriteRecords(records []*model.FileRecord) error {
 	if records == nil {
-		logger.Log.Error("write null records")
+		w.logger.Error("write null records")
 		return ErrWriteNullRecords
 	}
 
-	file, err := os.OpenFile(w.filename, os.O_WRONLY|os.O_APPEND|os.O_TRUNC, 0o666)
+	info, err := os.Stat(w.filename)
 	if err != nil {
-		logger.Log.Error("open file for write", zap.Error(err))
+		w.logger.Error("open file for write", zap.Error(err))
 		return ErrOpenFileForWrite
 	}
+	file, err := os.CreateTemp(filepath.Dir(w.filename), ".storage-*.tmp")
+	if err != nil {
+		w.logger.Error("open file for write", zap.Error(err))
+		return ErrOpenFileForWrite
+	}
+	temporaryName := file.Name()
 	defer func() {
-		if closeErr := file.Close(); returnErr == nil && closeErr != nil {
-			returnErr = fmt.Errorf("close file: %w", closeErr)
-		}
+		_ = file.Close()
+		_ = os.Remove(temporaryName)
 	}()
+	if err = file.Chmod(info.Mode().Perm()); err != nil {
+		return fmt.Errorf("set temporary file mode: %w", err)
+	}
 
 	if err = json.NewEncoder(file).Encode(records); err != nil {
-		logger.Log.Error("encode record", zap.Error(err))
+		w.logger.Error("encode record", zap.Error(err))
 		return fmt.Errorf("encode record: %w", err)
 	}
 	if err = file.Sync(); err != nil {
-		logger.Log.Error("sync file", zap.Error(err))
+		w.logger.Error("sync file", zap.Error(err))
 		return fmt.Errorf("sync file: %w", err)
+	}
+	if err = file.Close(); err != nil {
+		w.logger.Error("close file", zap.Error(err))
+		return fmt.Errorf("close file: %w", err)
+	}
+	if err = os.Rename(temporaryName, w.filename); err != nil {
+		w.logger.Error("rename file", zap.Error(err))
+		return fmt.Errorf("rename file: %w", err)
 	}
 	return nil
 }
