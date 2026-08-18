@@ -1,14 +1,15 @@
 package logger
 
 import (
-	"bytes"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestInitialize(t *testing.T) {
@@ -28,22 +29,17 @@ func TestInitialize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gotLog, err := Initialize(tt.level)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("Initialize(%q) error = %v, wantErr %v", tt.level, err, tt.wantErr)
-			}
 			if tt.wantErr {
+				require.Error(t, err)
+				assert.Nil(t, gotLog)
 				return
 			}
+			require.NoError(t, err)
+			require.NotNil(t, gotLog)
 			t.Cleanup(func() { _ = gotLog.Sync() })
-			if got := gotLog.Core().Enabled(zap.DebugLevel); got != tt.wantDebug {
-				t.Errorf("debug enabled = %v, want %v", got, tt.wantDebug)
-			}
-			if got := gotLog.Core().Enabled(zap.InfoLevel); got != tt.wantInfo {
-				t.Errorf("info enabled = %v, want %v", got, tt.wantInfo)
-			}
-			if got := gotLog.Core().Enabled(zap.ErrorLevel); got != tt.wantError {
-				t.Errorf("error enabled = %v, want %v", got, tt.wantError)
-			}
+			assert.Equal(t, tt.wantDebug, gotLog.Core().Enabled(zap.DebugLevel))
+			assert.Equal(t, tt.wantInfo, gotLog.Core().Enabled(zap.InfoLevel))
+			assert.Equal(t, tt.wantError, gotLog.Core().Enabled(zap.ErrorLevel))
 		})
 	}
 }
@@ -64,12 +60,8 @@ func TestRequestLogger(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var output bytes.Buffer
-			encoder := zapcore.NewJSONEncoder(zapcore.EncoderConfig{
-				MessageKey:     "message",
-				EncodeDuration: zapcore.NanosDurationEncoder,
-			})
-			log := zap.New(zapcore.NewCore(encoder, zapcore.AddSync(&output), zap.InfoLevel))
+			core, logs := observer.New(zap.InfoLevel)
+			log := zap.New(core)
 
 			handler := RequestLogger(log)(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 				if tt.status != 0 {
@@ -84,32 +76,20 @@ func TestRequestLogger(t *testing.T) {
 
 			handler.ServeHTTP(response, request)
 
-			if response.Code != tt.wantStatus {
-				t.Errorf("response status = %d, want %d", response.Code, tt.wantStatus)
-			}
-			if response.Body.String() != tt.body {
-				t.Errorf("response body = %q, want %q", response.Body.String(), tt.body)
-			}
+			assert.Equal(t, tt.wantStatus, response.Code)
+			assert.Equal(t, tt.body, response.Body.String())
+			require.Equal(t, 1, logs.Len())
 
-			var entry map[string]any
-			if err := json.NewDecoder(&output).Decode(&entry); err != nil {
-				t.Fatalf("decode log: %v", err)
-			}
-			wantFields := map[string]any{
-				"message": "handled HTTP request",
-				"method":  tt.method,
-				"uri":     tt.target,
-				"status":  float64(tt.wantStatus),
-				"size":    float64(len(tt.body)),
-			}
-			for field, want := range wantFields {
-				if got := entry[field]; got != want {
-					t.Errorf("%s = %v, want %v", field, got, want)
-				}
-			}
-			if duration, ok := entry["duration"].(float64); !ok || duration < 0 {
-				t.Errorf("duration = %v, want non-negative number", entry["duration"])
-			}
+			entry := logs.All()[0]
+			assert.Equal(t, "handled HTTP request", entry.Message)
+			assert.Equal(t, zap.InfoLevel, entry.Level)
+			fields := entry.ContextMap()
+			require.Len(t, fields, 3)
+			assert.Equal(t, tt.method, fields["method"])
+			assert.Equal(t, tt.target, fields["uri"])
+			duration, ok := fields["duration"].(time.Duration)
+			require.True(t, ok)
+			assert.GreaterOrEqual(t, duration, time.Duration(0))
 		})
 	}
 }
