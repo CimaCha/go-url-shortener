@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-chi/chi/v5/middleware"
 	"go.uber.org/zap"
 )
 
@@ -27,19 +26,16 @@ func Initialize(level string) (*zap.Logger, error) {
 func RequestLogger(log *zap.Logger) func(http.Handler) http.Handler {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			response := middleware.NewWrapResponseWriter(writer, request.ProtoMajor)
 			started := time.Now()
 			defer func() {
 				log.Info("handled HTTP request",
 					zap.String("method", request.Method),
 					zap.String("uri", request.RequestURI),
 					zap.Duration("duration", time.Since(started)),
-					zap.Int("status", response.Status()),
-					zap.Int("size", response.BytesWritten()),
 				)
 			}()
 
-			handler.ServeHTTP(response, request)
+			handler.ServeHTTP(writer, request)
 		})
 	}
 }
