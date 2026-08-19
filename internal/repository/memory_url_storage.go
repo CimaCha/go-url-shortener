@@ -2,12 +2,13 @@ package repository
 
 import (
 	"errors"
+	"maps"
 	"sync"
 )
 
 var (
 	ErrURLNotFound    = errors.New("URL not found")
-	ErrShortURLExists = errors.New("Short URL already exists")
+	ErrShortURLExists = errors.New("short URL already exists")
 )
 
 type MemoryURLStorage struct {
@@ -15,8 +16,7 @@ type MemoryURLStorage struct {
 	urls map[string]string
 }
 
-func NewMemoryURLStorage() *MemoryURLStorage {
-	urls := map[string]string{}
+func NewMemoryURLStorage(urls map[string]string) *MemoryURLStorage {
 	return &MemoryURLStorage{urls: urls}
 }
 
@@ -41,4 +41,11 @@ func (s *MemoryURLStorage) GetFullURL(shortURL string) (string, error) {
 	}
 
 	return fullURL, nil
+}
+
+func (s *MemoryURLStorage) Snapshot() map[string]string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return maps.Clone(s.urls)
 }

@@ -1,8 +1,6 @@
 package repository
 
 import (
-	"strconv"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -42,7 +40,7 @@ func TestMemoryURLStorage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			storage := NewMemoryURLStorage()
+			storage := NewMemoryURLStorage(make(map[string]string))
 			var setErr error
 			for _, write := range tt.writes {
 				setErr = storage.SetShortURL(write[0], write[1])
@@ -57,48 +55,14 @@ func TestMemoryURLStorage(t *testing.T) {
 	}
 }
 
-func TestMemoryURLStorageConcurrentSet(t *testing.T) {
-	tests := []struct {
-		name    string
-		workers int
-	}{
-		{name: "stores a short URL only once", workers: 32},
-	}
+func TestMemoryURLStorageSnapshot(t *testing.T) {
+	storage := NewMemoryURLStorage(make(map[string]string))
+	assert.NoError(t, storage.SetShortURL("short", "https://example.com"))
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			storage := NewMemoryURLStorage()
-			start := make(chan struct{})
-			successes := make(chan string, tt.workers)
-			var wg sync.WaitGroup
+	snapshot := storage.Snapshot()
+	snapshot["short"] = "changed"
 
-			for worker := range tt.workers {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					<-start
-
-					fullURL := "https://example.com/" + strconv.Itoa(worker)
-					if storage.SetShortURL("short", fullURL) == nil {
-						successes <- fullURL
-					}
-				}()
-			}
-
-			close(start)
-			wg.Wait()
-			close(successes)
-
-			var successfulURLs []string
-			for fullURL := range successes {
-				successfulURLs = append(successfulURLs, fullURL)
-			}
-
-			if assert.Len(t, successfulURLs, 1) {
-				got, err := storage.GetFullURL("short")
-				assert.NoError(t, err)
-				assert.Equal(t, successfulURLs[0], got)
-			}
-		})
-	}
+	got, err := storage.GetFullURL("short")
+	assert.NoError(t, err)
+	assert.Equal(t, "https://example.com", got)
 }

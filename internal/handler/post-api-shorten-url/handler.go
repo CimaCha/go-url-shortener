@@ -1,12 +1,13 @@
-package shortenurl
+package apishortenurl
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/CimaCha/go-url-shortener/internal/model"
+	"github.com/CimaCha/go-url-shortener/internal/service"
 	"io"
 	"net/http"
-
-	"github.com/CimaCha/go-url-shortener/internal/service"
 )
 
 //go:generate mockgen -source=handler.go -destination=mocks/mock_url_handler.gen.go -package=mocks
@@ -20,18 +21,24 @@ type Handler struct {
 	defaultShortAddress string
 }
 
-func NewShortenURLHandler(service URLService, defaultShortAddress string) Handler {
+func NewAPIShortenURLHandler(service URLService, defaultShortAddress string) Handler {
 	return Handler{service: service, defaultShortAddress: defaultShortAddress}
 }
 
 func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
-
+	var decodedBody model.ShortenURLRequest
+	var encodedBody model.ShortenURLResponse
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	url, err := h.service.SetShortURL(string(body))
+	err = json.Unmarshal(body, &decodedBody)
+	if err != nil {
+		http.Error(res, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+	url, err := h.service.SetShortURL(decodedBody.URL)
 	if err != nil {
 		if errors.Is(err, service.ErrEmptyURL) {
 			http.Error(res, err.Error(), http.StatusBadRequest)
@@ -42,7 +49,12 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	}
 
 	finalURL := fmt.Sprintf("%s/%s", h.defaultShortAddress, url)
-	res.Header().Set("Content-Type", "text/plain")
+	encodedBody.Result = finalURL
+	res.Header().Set("Content-Type", "application/json")
 	res.WriteHeader(http.StatusCreated)
-	_, _ = res.Write([]byte(finalURL))
+	responseBody, err := json.Marshal(encodedBody)
+	if err != nil {
+		return
+	}
+	_, _ = res.Write(responseBody)
 }

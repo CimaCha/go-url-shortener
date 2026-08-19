@@ -2,16 +2,23 @@ package fullurl
 
 import (
 	"errors"
+	"net/http"
+
 	"github.com/CimaCha/go-url-shortener/internal/service"
 	"github.com/go-chi/chi/v5"
-	"net/http"
 )
 
-type Handler struct {
-	service service.Service
+//go:generate mockgen -source=handler.go -destination=mocks/mock_url_handler.gen.go -package=mocks
+
+type URLService interface {
+	GetFullURL(shortURL string) (string, error)
 }
 
-func NewGetFullURLHandler(service service.Service) Handler {
+type Handler struct {
+	service URLService
+}
+
+func NewGetFullURLHandler(service URLService) Handler {
 	return Handler{service: service}
 }
 
