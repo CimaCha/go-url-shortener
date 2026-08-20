@@ -3,7 +3,8 @@ package service
 import (
 	"crypto/rand"
 	"errors"
-	"github.com/CimaCha/go-url-shortener/internal/repository/memory-storage"
+
+	"github.com/CimaCha/go-url-shortener/internal/repository"
 )
 
 const maxShortURLAttempts = 5
@@ -36,7 +37,7 @@ func (s Service) SetShortURL(fullURL string) (string, error) {
 		if err == nil {
 			return shortURL, nil
 		}
-		if !errors.Is(err, memory_storage.ErrShortURLExists) {
+		if !errors.Is(err, repository.ErrShortURLExists) {
 			return "", ErrRepository
 		}
 	}
@@ -50,7 +51,7 @@ func (s Service) GetFullURL(shortURL string) (string, error) {
 	}
 	fullURL, err := s.storage.GetFullURL(shortURL)
 	if err != nil {
-		if errors.Is(err, memory_storage.ErrURLNotFound) {
+		if errors.Is(err, repository.ErrURLNotFound) {
 			return "", ErrURLNotFound
 		}
 		return "", ErrRepository

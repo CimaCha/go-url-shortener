@@ -56,12 +56,13 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	defer storage.Db.Close()
 	shortenURLService := service.NewService(fileStorage)
 
 	shortenURLHandler := shortenurl.NewShortenURLHandler(shortenURLService, cfg.BasicShortenAddress)
 	apiShortenURLHandler := apishortenurl.NewAPIShortenURLHandler(shortenURLService, cfg.BasicShortenAddress)
 	getFullURLHandler := fullurl.NewGetFullURLHandler(shortenURLService)
-	pingConnectionHandler := getping.NewDBConnectionPingHandler(ctx, storage.Db)
+	pingConnectionHandler := getping.NewDBConnectionPingHandler(storage.Db)
 
 	router := shortenerrouter.New(
 		initializedLogger.With(zap.String("layer", "router")),

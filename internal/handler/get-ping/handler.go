@@ -2,27 +2,25 @@ package get_ping
 
 import (
 	"context"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http"
 )
 
-//go:generate mockgen -source=handler.go -destination=mocks/mock_url_handler.gen.go -package=mocks
+//go:generate mockgen -source=handler.go -destination=mocks/mock_pinger.gen.go -package=mocks
 
-type Service interface {
-	Ping() error
+type GetPingService interface {
+	Ping(context.Context) error
 }
 
 type Handler struct {
-	ctx    context.Context
-	dbPool *pgxpool.Pool
+	dbPool GetPingService
 }
 
-func NewDBConnectionPingHandler(ctx context.Context, dbPool *pgxpool.Pool) Handler {
-	return Handler{ctx: ctx, dbPool: dbPool}
+func NewDBConnectionPingHandler(dbPool GetPingService) Handler {
+	return Handler{dbPool: dbPool}
 }
 
-func (h Handler) ServeHTTP(res http.ResponseWriter, _ *http.Request) {
-	err := h.dbPool.Ping(h.ctx)
+func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
+	err := h.dbPool.Ping(req.Context())
 	if err != nil {
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return

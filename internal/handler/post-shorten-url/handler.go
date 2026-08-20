@@ -11,16 +11,16 @@ import (
 
 //go:generate mockgen -source=handler.go -destination=mocks/mock_url_handler.gen.go -package=mocks
 
-type URLService interface {
+type PostShortenService interface {
 	SetShortURL(fullURL string) (string, error)
 }
 
 type Handler struct {
-	service             URLService
+	service             PostShortenService
 	defaultShortAddress string
 }
 
-func NewShortenURLHandler(service URLService, defaultShortAddress string) Handler {
+func NewShortenURLHandler(service PostShortenService, defaultShortAddress string) Handler {
 	return Handler{service: service, defaultShortAddress: defaultShortAddress}
 }
 

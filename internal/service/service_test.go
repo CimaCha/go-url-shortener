@@ -2,9 +2,9 @@ package service
 
 import (
 	"errors"
-	"github.com/CimaCha/go-url-shortener/internal/repository/memory-storage"
 	"testing"
 
+	"github.com/CimaCha/go-url-shortener/internal/repository"
 	"github.com/CimaCha/go-url-shortener/internal/service/mocks"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -86,7 +86,7 @@ func TestServiceGetFullURL(t *testing.T) {
 			name:     "missing URL",
 			shortURL: "missing",
 			setup: func(storage *mocks.MockURLStorage) {
-				storage.EXPECT().GetFullURL("missing").Return("", memory_storage.ErrURLNotFound)
+				storage.EXPECT().GetFullURL("missing").Return("", repository.ErrURLNotFound)
 			},
 			wantErr: ErrURLNotFound,
 		},

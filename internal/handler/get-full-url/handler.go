@@ -10,15 +10,15 @@ import (
 
 //go:generate mockgen -source=handler.go -destination=mocks/mock_url_handler.gen.go -package=mocks
 
-type URLService interface {
+type GetFullURLService interface {
 	GetFullURL(shortURL string) (string, error)
 }
 
 type Handler struct {
-	service URLService
+	service GetFullURLService
 }
 
-func NewGetFullURLHandler(service URLService) Handler {
+func NewGetFullURLHandler(service GetFullURLService) Handler {
 	return Handler{service: service}
 }
 
