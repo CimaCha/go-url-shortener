@@ -21,7 +21,7 @@ func NewDBConnectionPingHandler(ctx context.Context, dbPool *pgxpool.Pool) Handl
 	return Handler{ctx: ctx, dbPool: dbPool}
 }
 
-func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
+func (h Handler) ServeHTTP(res http.ResponseWriter, _ *http.Request) {
 	err := h.dbPool.Ping(h.ctx)
 	if err != nil {
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
