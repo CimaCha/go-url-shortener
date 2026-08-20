@@ -4,13 +4,13 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"github.com/CimaCha/go-url-shortener/internal/repository/memory-storage"
 	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/CimaCha/go-url-shortener/internal/model"
-	"github.com/CimaCha/go-url-shortener/internal/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -75,7 +75,7 @@ func TestNewFileStorage(t *testing.T) {
 				assert.Equal(t, wantFullURL, got)
 			}
 			_, getErr := storage.GetFullURL("missing")
-			assert.ErrorIs(t, getErr, repository.ErrURLNotFound)
+			assert.ErrorIs(t, getErr, memory_storage.ErrURLNotFound)
 		})
 	}
 }
@@ -104,7 +104,7 @@ func TestStorageSetShortURL(t *testing.T) {
 				{"short", "https://first.example"},
 				{"short", "https://second.example"},
 			},
-			wantSetErr: repository.ErrShortURLExists,
+			wantSetErr: memory_storage.ErrShortURLExists,
 			wantURLs: map[string]string{
 				"short": "https://first.example",
 			},
@@ -185,7 +185,7 @@ func TestStorageUsesMemoryAsSourceOfTruth(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, "https://first.example", got)
 			_, err = storage.GetFullURL("external")
-			assert.ErrorIs(t, err, repository.ErrURLNotFound)
+			assert.ErrorIs(t, err, memory_storage.ErrURLNotFound)
 		})
 	}
 }

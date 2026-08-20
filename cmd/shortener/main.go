@@ -1,13 +1,16 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	database_storage "github.com/CimaCha/go-url-shortener/internal/repository/database-storage"
 	"log"
 	"net/http"
 	"os"
 
 	"github.com/CimaCha/go-url-shortener/internal/config"
 	"github.com/CimaCha/go-url-shortener/internal/handler/get-full-url"
+	getping "github.com/CimaCha/go-url-shortener/internal/handler/get-ping"
 	apishortenurl "github.com/CimaCha/go-url-shortener/internal/handler/post-api-shorten-url"
 	"github.com/CimaCha/go-url-shortener/internal/handler/post-shorten-url"
 	"github.com/CimaCha/go-url-shortener/internal/logger"
@@ -36,6 +39,7 @@ func main() {
 }
 
 func run() error {
+	ctx := context.Background()
 	cfg, err := config.New()
 	if err != nil {
 		initializedLogger.Error("cannot parse config")
@@ -47,17 +51,24 @@ func run() error {
 		initializedLogger.Error("new file storage error", zap.Error(err))
 		return fmt.Errorf("open file storage: %w", err)
 	}
+
+	storage, err := database_storage.NewDatabaseStorage(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
 	shortenURLService := service.NewService(fileStorage)
 
 	shortenURLHandler := shortenurl.NewShortenURLHandler(shortenURLService, cfg.BasicShortenAddress)
 	apiShortenURLHandler := apishortenurl.NewAPIShortenURLHandler(shortenURLService, cfg.BasicShortenAddress)
 	getFullURLHandler := fullurl.NewGetFullURLHandler(shortenURLService)
+	pingConnectionHandler := getping.NewDBConnectionPingHandler(ctx, storage.Db)
 
 	router := shortenerrouter.New(
 		initializedLogger.With(zap.String("layer", "router")),
 		shortenURLHandler,
 		apiShortenURLHandler,
-		getFullURLHandler)
+		getFullURLHandler,
+		pingConnectionHandler)
 
 	err = http.ListenAndServe(cfg.Address, router)
 	if err != nil {

@@ -1,4 +1,4 @@
-package repository
+package memory_storage
 
 import (
 	"errors"

@@ -2,15 +2,15 @@ package file
 
 import (
 	"fmt"
+	"github.com/CimaCha/go-url-shortener/internal/repository/memory-storage"
 	"strconv"
 	"sync"
 
 	"github.com/CimaCha/go-url-shortener/internal/model"
-	"github.com/CimaCha/go-url-shortener/internal/repository"
 )
 
 type Storage struct {
-	memory *repository.MemoryURLStorage
+	memory *memory_storage.MemoryURLStorage
 	writer *Writer
 	mu     sync.Mutex
 }
@@ -33,7 +33,7 @@ func NewFileStorage(filePath string) (*Storage, error) {
 	for _, record := range records {
 		urls[record.ShortURL] = record.OriginalURL
 	}
-	memory := repository.NewMemoryURLStorage(urls)
+	memory := memory_storage.NewMemoryURLStorage(urls)
 
 	return &Storage{
 		memory: memory,
