@@ -24,7 +24,7 @@ func TestNew(t *testing.T) {
 		wantBaseURL  string
 		wantFilePath string
 	}{
-		{name: "defaults", wantAddress: "localhost:8080", wantBaseURL: "http://localhost:8080", wantFilePath: "./storage.json"},
+		{name: "defaults", wantAddress: "localhost:8080", wantBaseURL: "http://localhost:8080"},
 		{name: "flags", args: []string{"-a", "cli:8080", "-b", "http://cli:8080", "-f", "/tmp/cli-storage.json"}, wantAddress: "cli:8080", wantBaseURL: "http://cli:8080", wantFilePath: "/tmp/cli-storage.json"},
 		{name: "environment overrides flags", args: []string{"-a", "cli:8080", "-b", "http://cli:8080", "-f", "/tmp/cli-storage.json"}, envAddress: "env:9090", envBaseURL: "http://env:9090", envFilePath: "/tmp/env-storage.json", wantAddress: "env:9090", wantBaseURL: "http://env:9090", wantFilePath: "/tmp/env-storage.json"},
 	}

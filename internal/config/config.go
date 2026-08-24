@@ -16,11 +16,10 @@ type Config struct {
 }
 
 func New() (*Config, error) {
-
 	netAddress := configflag.NewNetAddressFlag("a", "address of service", "localhost:8080")
 	basicShortenAddress := configflag.NewNetAddressFlag("b", "basic address for short url", "http://localhost:8080")
-	filePath := configflag.NewFilePathFlag("f", "path to the storage file", "./storage.json")
-	databaseURL := db.NewDatabaseURLFlag("d", "database url", "postgres://username:password@localhost:5432/database_name")
+	filePath := configflag.NewFilePathFlag("f", "path to the storage file", "")
+	databaseURL := db.NewDatabaseURLFlag("d", "database url", "")
 	flag.Parse()
 
 	var config Config
