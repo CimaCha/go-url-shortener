@@ -10,46 +10,47 @@
 package mocks
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockGetFullURLService is a mock of GetFullURLService interface.
-type MockGetFullURLService struct {
+// MockResolver is a mock of Resolver interface.
+type MockResolver struct {
 	ctrl     *gomock.Controller
-	recorder *MockGetFullURLServiceMockRecorder
+	recorder *MockResolverMockRecorder
 	isgomock struct{}
 }
 
-// MockGetFullURLServiceMockRecorder is the mock recorder for MockGetFullURLService.
-type MockGetFullURLServiceMockRecorder struct {
-	mock *MockGetFullURLService
+// MockResolverMockRecorder is the mock recorder for MockResolver.
+type MockResolverMockRecorder struct {
+	mock *MockResolver
 }
 
-// NewMockGetFullURLService creates a new mock instance.
-func NewMockGetFullURLService(ctrl *gomock.Controller) *MockGetFullURLService {
-	mock := &MockGetFullURLService{ctrl: ctrl}
-	mock.recorder = &MockGetFullURLServiceMockRecorder{mock}
+// NewMockResolver creates a new mock instance.
+func NewMockResolver(ctrl *gomock.Controller) *MockResolver {
+	mock := &MockResolver{ctrl: ctrl}
+	mock.recorder = &MockResolverMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockGetFullURLService) EXPECT() *MockGetFullURLServiceMockRecorder {
+func (m *MockResolver) EXPECT() *MockResolverMockRecorder {
 	return m.recorder
 }
 
 // Resolve mocks base method.
-func (m *MockGetFullURLService) Resolve(shortURL string) (string, error) {
+func (m *MockResolver) Resolve(ctx context.Context, shortURL string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Resolve", shortURL)
+	ret := m.ctrl.Call(m, "Resolve", ctx, shortURL)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Resolve indicates an expected call of Resolve.
-func (mr *MockGetFullURLServiceMockRecorder) Resolve(shortURL any) *gomock.Call {
+func (mr *MockResolverMockRecorder) Resolve(ctx, shortURL any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Resolve", reflect.TypeOf((*MockGetFullURLService)(nil).Resolve), shortURL)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Resolve", reflect.TypeOf((*MockResolver)(nil).Resolve), ctx, shortURL)
 }

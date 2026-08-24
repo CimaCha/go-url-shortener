@@ -1,4 +1,4 @@
-package database_storage
+package postgres
 
 import (
 	"context"
@@ -19,7 +19,6 @@ var (
 )
 
 type Storage struct {
-	ctx  context.Context
 	Pool *pgxpool.Pool
 }
 
@@ -39,11 +38,11 @@ func NewDatabaseStorage(ctx context.Context, databaseURL string) (*Storage, erro
 		pool.Close()
 		return nil, fmt.Errorf("migrate database: %w", err)
 	}
-	return &Storage{ctx: ctx, Pool: pool}, nil
+	return &Storage{Pool: pool}, nil
 }
 
-func (s Storage) SaveShortURL(shortURL string, fullURL string) error {
-	_, err := s.Pool.Exec(s.ctx, "INSERT INTO urls(short_url, full_url) VALUES($1,$2)", shortURL, fullURL)
+func (s Storage) SaveShortURL(ctx context.Context, shortURL string, fullURL string) error {
+	_, err := s.Pool.Exec(ctx, "INSERT INTO urls(short_url, full_url) VALUES($1,$2)", shortURL, fullURL)
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 		return repository.ErrShortURLExists
@@ -51,9 +50,9 @@ func (s Storage) SaveShortURL(shortURL string, fullURL string) error {
 	return err
 }
 
-func (s Storage) FindFullURL(shortURL string) (string, error) {
+func (s Storage) FindFullURL(ctx context.Context, shortURL string) (string, error) {
 	var fullURL string
-	err := s.Pool.QueryRow(s.ctx, "SELECT full_url FROM urls WHERE short_url = $1", shortURL).Scan(&fullURL)
+	err := s.Pool.QueryRow(ctx, "SELECT full_url FROM urls WHERE short_url = $1", shortURL).Scan(&fullURL)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", repository.ErrURLNotFound
 	}

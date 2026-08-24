@@ -16,32 +16,32 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockGetPingService is a mock of GetPingService interface.
-type MockGetPingService struct {
+// MockPinger is a mock of Pinger interface.
+type MockPinger struct {
 	ctrl     *gomock.Controller
-	recorder *MockGetPingServiceMockRecorder
+	recorder *MockPingerMockRecorder
 	isgomock struct{}
 }
 
-// MockGetPingServiceMockRecorder is the mock recorder for MockGetPingService.
-type MockGetPingServiceMockRecorder struct {
-	mock *MockGetPingService
+// MockPingerMockRecorder is the mock recorder for MockPinger.
+type MockPingerMockRecorder struct {
+	mock *MockPinger
 }
 
-// NewMockGetPingService creates a new mock instance.
-func NewMockGetPingService(ctrl *gomock.Controller) *MockGetPingService {
-	mock := &MockGetPingService{ctrl: ctrl}
-	mock.recorder = &MockGetPingServiceMockRecorder{mock}
+// NewMockPinger creates a new mock instance.
+func NewMockPinger(ctrl *gomock.Controller) *MockPinger {
+	mock := &MockPinger{ctrl: ctrl}
+	mock.recorder = &MockPingerMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockGetPingService) EXPECT() *MockGetPingServiceMockRecorder {
+func (m *MockPinger) EXPECT() *MockPingerMockRecorder {
 	return m.recorder
 }
 
 // Ping mocks base method.
-func (m *MockGetPingService) Ping(arg0 context.Context) error {
+func (m *MockPinger) Ping(arg0 context.Context) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Ping", arg0)
 	ret0, _ := ret[0].(error)
@@ -49,7 +49,7 @@ func (m *MockGetPingService) Ping(arg0 context.Context) error {
 }
 
 // Ping indicates an expected call of Ping.
-func (mr *MockGetPingServiceMockRecorder) Ping(arg0 any) *gomock.Call {
+func (mr *MockPingerMockRecorder) Ping(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockGetPingService)(nil).Ping), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockPinger)(nil).Ping), arg0)
 }

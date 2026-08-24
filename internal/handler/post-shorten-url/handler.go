@@ -1,8 +1,10 @@
 package shortenurl
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"go.uber.org/zap"
 	"io"
 	"net/http"
 
@@ -11,31 +13,38 @@ import (
 
 //go:generate mockgen -source=handler.go -destination=mocks/mock_url_handler.gen.go -package=mocks
 
-type PostShortenService interface {
-	Shorten(fullURL string) (string, error)
+type Shortener interface {
+	Shorten(ctx context.Context, fullURL string) (string, error)
 }
 
 type Handler struct {
-	service             PostShortenService
+	log                 zap.Logger
+	service             Shortener
 	defaultShortAddress string
 }
 
-func NewShortenURLHandler(service PostShortenService, defaultShortAddress string) Handler {
-	return Handler{service: service, defaultShortAddress: defaultShortAddress}
+func NewShortenURLHandler(log zap.Logger, service Shortener, defaultShortAddress string) Handler {
+	return Handler{
+		log:                 log,
+		service:             service,
+		defaultShortAddress: defaultShortAddress,
+	}
 }
 
 func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
+		h.log.Error("can't read body", zap.Error(err))
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	url, err := h.service.Shorten(string(body))
+	url, err := h.service.Shorten(req.Context(), string(body))
 	if err != nil {
 		if errors.Is(err, service.ErrEmptyURL) {
 			http.Error(res, err.Error(), http.StatusBadRequest)
 		} else {
+			h.log.Error("can't shorten URL", zap.Error(err))
 			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		}
 		return

@@ -1,6 +1,7 @@
 package shortenurl
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"github.com/CimaCha/go-url-shortener/internal/service"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/zap"
 )
 
 var errHandlerService = errors.New("service error")
@@ -25,7 +27,7 @@ func TestShortenURLHandler(t *testing.T) {
 		name            string
 		body            string
 		readError       bool
-		setup           func(*mocks.MockPostShortenService)
+		setup           func(*mocks.MockShortener, context.Context)
 		wantStatus      int
 		wantBody        string
 		wantContentType string
@@ -33,9 +35,9 @@ func TestShortenURLHandler(t *testing.T) {
 		{
 			name: "successful request",
 			body: "https://example.com/path",
-			setup: func(urlService *mocks.MockPostShortenService) {
+			setup: func(urlService *mocks.MockShortener, ctx context.Context) {
 				urlService.EXPECT().
-					Shorten("https://example.com/path").
+					Shorten(ctx, "https://example.com/path").
 					Return("short", nil)
 			},
 			wantStatus:      http.StatusCreated,
@@ -44,8 +46,8 @@ func TestShortenURLHandler(t *testing.T) {
 		},
 		{
 			name: "empty URL",
-			setup: func(urlService *mocks.MockPostShortenService) {
-				urlService.EXPECT().Shorten("").Return("", service.ErrEmptyURL)
+			setup: func(urlService *mocks.MockShortener, ctx context.Context) {
+				urlService.EXPECT().Shorten(ctx, "").Return("", service.ErrEmptyURL)
 			},
 			wantStatus:      http.StatusBadRequest,
 			wantBody:        "empty URL\n",
@@ -54,8 +56,8 @@ func TestShortenURLHandler(t *testing.T) {
 		{
 			name: "service error",
 			body: "https://example.com/path",
-			setup: func(urlService *mocks.MockPostShortenService) {
-				urlService.EXPECT().Shorten("https://example.com/path").Return("", errHandlerService)
+			setup: func(urlService *mocks.MockShortener, ctx context.Context) {
+				urlService.EXPECT().Shorten(ctx, "https://example.com/path").Return("", errHandlerService)
 			},
 			wantStatus:      http.StatusInternalServerError,
 			wantBody:        "Internal Server Error\n",
@@ -73,16 +75,16 @@ func TestShortenURLHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			controller := gomock.NewController(t)
-			urlService := mocks.NewMockPostShortenService(controller)
-			if tt.setup != nil {
-				tt.setup(urlService)
-			}
-			handler := NewShortenURLHandler(urlService, "http://localhost:8080")
+			urlService := mocks.NewMockShortener(controller)
 			var body io.Reader = strings.NewReader(tt.body)
 			if tt.readError {
 				body = errorReader{}
 			}
 			request := httptest.NewRequest(http.MethodPost, "/", body)
+			if tt.setup != nil {
+				tt.setup(urlService, request.Context())
+			}
+			handler := NewShortenURLHandler(*zap.NewNop(), urlService, "http://localhost:8080")
 			response := httptest.NewRecorder()
 
 			handler.ServeHTTP(response, request)

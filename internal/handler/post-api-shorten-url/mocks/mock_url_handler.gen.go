@@ -10,46 +10,47 @@
 package mocks
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockPostAPIShortenService is a mock of PostAPIShortenService interface.
-type MockPostAPIShortenService struct {
+// MockShortener is a mock of Shortener interface.
+type MockShortener struct {
 	ctrl     *gomock.Controller
-	recorder *MockPostAPIShortenServiceMockRecorder
+	recorder *MockShortenerMockRecorder
 	isgomock struct{}
 }
 
-// MockPostAPIShortenServiceMockRecorder is the mock recorder for MockPostAPIShortenService.
-type MockPostAPIShortenServiceMockRecorder struct {
-	mock *MockPostAPIShortenService
+// MockShortenerMockRecorder is the mock recorder for MockShortener.
+type MockShortenerMockRecorder struct {
+	mock *MockShortener
 }
 
-// NewMockPostAPIShortenService creates a new mock instance.
-func NewMockPostAPIShortenService(ctrl *gomock.Controller) *MockPostAPIShortenService {
-	mock := &MockPostAPIShortenService{ctrl: ctrl}
-	mock.recorder = &MockPostAPIShortenServiceMockRecorder{mock}
+// NewMockShortener creates a new mock instance.
+func NewMockShortener(ctrl *gomock.Controller) *MockShortener {
+	mock := &MockShortener{ctrl: ctrl}
+	mock.recorder = &MockShortenerMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockPostAPIShortenService) EXPECT() *MockPostAPIShortenServiceMockRecorder {
+func (m *MockShortener) EXPECT() *MockShortenerMockRecorder {
 	return m.recorder
 }
 
 // Shorten mocks base method.
-func (m *MockPostAPIShortenService) Shorten(fullURL string) (string, error) {
+func (m *MockShortener) Shorten(ctx context.Context, fullURL string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Shorten", fullURL)
+	ret := m.ctrl.Call(m, "Shorten", ctx, fullURL)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Shorten indicates an expected call of Shorten.
-func (mr *MockPostAPIShortenServiceMockRecorder) Shorten(fullURL any) *gomock.Call {
+func (mr *MockShortenerMockRecorder) Shorten(ctx, fullURL any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Shorten", reflect.TypeOf((*MockPostAPIShortenService)(nil).Shorten), fullURL)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Shorten", reflect.TypeOf((*MockShortener)(nil).Shorten), ctx, fullURL)
 }

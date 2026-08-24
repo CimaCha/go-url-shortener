@@ -3,6 +3,7 @@ package file
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"os"
@@ -51,6 +52,7 @@ func TestNewFileStorage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
 			filename := filepath.Join(t.TempDir(), "storage.json")
 			if tt.filename != nil {
 				filename = tt.filename(t)
@@ -70,11 +72,11 @@ func TestNewFileStorage(t *testing.T) {
 			}
 			require.NoError(t, err)
 			for shortURL, wantFullURL := range tt.want {
-				got, getErr := storage.FindFullURL(shortURL)
+				got, getErr := storage.FindFullURL(ctx, shortURL)
 				require.NoError(t, getErr)
 				assert.Equal(t, wantFullURL, got)
 			}
-			_, getErr := storage.FindFullURL("missing")
+			_, getErr := storage.FindFullURL(ctx, "missing")
 			assert.ErrorIs(t, getErr, repository.ErrURLNotFound)
 		})
 	}
@@ -113,6 +115,7 @@ func TestStorageSetShortURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
 			filename := filepath.Join(t.TempDir(), "storage.json")
 			require.NoError(t, os.WriteFile(filename, nil, 0o600))
 			storage, err := NewFileStorage(filename)
@@ -120,7 +123,7 @@ func TestStorageSetShortURL(t *testing.T) {
 
 			var setErr error
 			for _, write := range tt.writes {
-				setErr = storage.SaveShortURL(write[0], write[1])
+				setErr = storage.SaveShortURL(ctx, write[0], write[1])
 			}
 
 			assert.ErrorIs(t, setErr, tt.wantSetErr)
@@ -145,6 +148,7 @@ func TestStorageSetShortURLWriteFailure(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
 			root := t.TempDir()
 			filename := filepath.Join(root, "storage.json")
 			require.NoError(t, os.WriteFile(filename, nil, 0o600))
@@ -152,10 +156,10 @@ func TestStorageSetShortURLWriteFailure(t *testing.T) {
 			require.NoError(t, err)
 			storage.writer = NewWriter(filepath.Join(root, "missing", "storage.json"))
 
-			err = storage.SaveShortURL("short", "https://example.com")
+			err = storage.SaveShortURL(ctx, "short", "https://example.com")
 
 			assert.ErrorIs(t, err, ErrOpenFileForWrite)
-			got, getErr := storage.FindFullURL("short")
+			got, getErr := storage.FindFullURL(ctx, "short")
 			require.NoError(t, getErr)
 			assert.Equal(t, "https://example.com", got)
 		})
@@ -171,6 +175,7 @@ func TestStorageUsesMemoryAsSourceOfTruth(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
 			filename := filepath.Join(t.TempDir(), "storage.json")
 			writeRecords(t, filename, []*model.FileRecord{
 				{UUID: "1", ShortURL: "first", OriginalURL: "https://first.example"},
@@ -181,10 +186,10 @@ func TestStorageUsesMemoryAsSourceOfTruth(t *testing.T) {
 				{UUID: "99", ShortURL: "external", OriginalURL: "https://external.example"},
 			})
 
-			got, err := storage.FindFullURL("first")
+			got, err := storage.FindFullURL(ctx, "first")
 			require.NoError(t, err)
 			assert.Equal(t, "https://first.example", got)
-			_, err = storage.FindFullURL("external")
+			_, err = storage.FindFullURL(ctx, "external")
 			assert.ErrorIs(t, err, repository.ErrURLNotFound)
 		})
 	}

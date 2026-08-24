@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"errors"
 	"maps"
 	"sync"
@@ -20,7 +21,7 @@ func NewMemoryURLStorage(urls map[string]string) *MemoryURLStorage {
 	return &MemoryURLStorage{urls: urls}
 }
 
-func (s *MemoryURLStorage) SaveShortURL(shortURL string, fullURL string) error {
+func (s *MemoryURLStorage) SaveShortURL(_ context.Context, shortURL string, fullURL string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	_, ok := s.urls[shortURL]
@@ -31,7 +32,7 @@ func (s *MemoryURLStorage) SaveShortURL(shortURL string, fullURL string) error {
 	return nil
 }
 
-func (s *MemoryURLStorage) FindFullURL(shortURL string) (string, error) {
+func (s *MemoryURLStorage) FindFullURL(_ context.Context, shortURL string) (string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

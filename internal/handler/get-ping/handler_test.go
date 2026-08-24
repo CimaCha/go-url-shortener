@@ -1,4 +1,4 @@
-package get_ping
+package ping
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"github.com/CimaCha/go-url-shortener/internal/handler/get-ping/mocks"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/zap"
 )
 
 type contextKey struct{}
@@ -36,11 +37,11 @@ func TestDBConnectionPingHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			controller := gomock.NewController(t)
-			dbPool := mocks.NewMockGetPingService(controller)
+			dbPool := mocks.NewMockPinger(controller)
 			request := httptest.NewRequest(http.MethodGet, "/ping", nil)
 			request = request.WithContext(context.WithValue(request.Context(), contextKey{}, "request"))
 			dbPool.EXPECT().Ping(request.Context()).Return(tt.pingError)
-			handler := NewDBConnectionPingHandler(dbPool)
+			handler := NewDBConnectionPingHandler(*zap.NewNop(), dbPool)
 			response := httptest.NewRecorder()
 
 			handler.ServeHTTP(response, request)

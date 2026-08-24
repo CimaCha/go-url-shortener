@@ -8,7 +8,6 @@ import (
 	"github.com/CimaCha/go-url-shortener/internal/repository/file"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/CimaCha/go-url-shortener/internal/config"
 	"github.com/CimaCha/go-url-shortener/internal/handler/get-full-url"
@@ -21,34 +20,28 @@ import (
 	"go.uber.org/zap"
 )
 
-var (
-	initializedLogger *zap.Logger
-	err               error
-)
-
 func main() {
-	initializedLogger, err = logger.Initialize("debug")
+	initializedLogger, err := logger.Initialize("debug")
 	if err != nil {
 		log.Fatal("logger initialization error", err.Error())
 	}
-	if err = run(); err != nil {
-		initializedLogger.Error("application stopped", zap.Error(err))
-		_ = initializedLogger.Sync()
-		os.Exit(1)
+	defer initializedLogger.Sync()
+
+	if err = run(*initializedLogger); err != nil {
+		initializedLogger.Fatal("application stopped", zap.Error(err))
 	}
-	_ = initializedLogger.Sync()
 }
 
-func run() error {
+func run(log zap.Logger) error {
 	ctx := context.Background()
 	cfg, err := config.New()
 	if err != nil {
-		initializedLogger.Error("cannot parse config")
+		log.Error("cannot parse config")
 		return err
 	}
 
 	var storage service.URLStorage
-	var pingHandler http.Handler = getping.NewDBConnectionPingHandler(
+	var pingHandler http.Handler = getping.NewDBConnectionPingHandler(log,
 		getping.PingFunc(func(context.Context) error {
 			return errors.New("database is not configured")
 		}),
@@ -63,7 +56,7 @@ func run() error {
 		defer dbStorage.Close()
 
 		storage = dbStorage
-		pingHandler = getping.NewDBConnectionPingHandler(dbStorage)
+		pingHandler = getping.NewDBConnectionPingHandler(*log.With(zap.String("handler", "ping to db")), dbStorage)
 
 	case cfg.FilePath != "":
 		fileStorage, err := file.NewFileStorage(cfg.FilePath)
@@ -78,12 +71,12 @@ func run() error {
 
 	urlService := service.NewService(storage)
 
-	shortenURLHandler := shortenurl.NewShortenURLHandler(urlService, cfg.BasicShortenAddress)
-	apiShortenURLHandler := apishortenurl.NewAPIShortenURLHandler(urlService, cfg.BasicShortenAddress)
-	getFullURLHandler := fullurl.NewGetFullURLHandler(urlService)
+	shortenURLHandler := shortenurl.NewShortenURLHandler(*log.With(zap.String("handler", "shorten URL")), urlService, cfg.BasicShortenAddress)
+	apiShortenURLHandler := apishortenurl.NewAPIShortenURLHandler(*log.With(zap.String("handler", "api shorten URL")), urlService, cfg.BasicShortenAddress)
+	getFullURLHandler := fullurl.NewGetFullURLHandler(*log.With(zap.String("handler", "get full URL")), urlService)
 
 	router := shortenerrouter.New(
-		initializedLogger.With(zap.String("layer", "router")),
+		log.With(zap.String("layer", "router")),
 		shortenURLHandler,
 		apiShortenURLHandler,
 		getFullURLHandler,
@@ -91,7 +84,7 @@ func run() error {
 
 	err = http.ListenAndServe(cfg.Address, router)
 	if err != nil {
-		initializedLogger.Error("HTTP server stopped", zap.Error(err))
+		log.Error("HTTP server stopped", zap.Error(err))
 		return err
 	}
 	return nil

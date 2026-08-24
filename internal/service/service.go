@@ -1,8 +1,10 @@
 package service
 
 import (
+	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 
 	"github.com/CimaCha/go-url-shortener/internal/repository"
 )
@@ -27,29 +29,29 @@ func NewService(storage URLStorage) Service {
 	}
 }
 
-func (s Service) Shorten(fullURL string) (string, error) {
+func (s Service) Shorten(ctx context.Context, fullURL string) (string, error) {
 	if fullURL == "" {
 		return "", ErrEmptyURL
 	}
 	for range maxShortURLAttempts {
 		shortURL := rand.Text()
-		err := s.storage.SaveShortURL(shortURL, fullURL)
+		err := s.storage.SaveShortURL(ctx, shortURL, fullURL)
 		if err == nil {
 			return shortURL, nil
 		}
 		if !errors.Is(err, repository.ErrShortURLExists) {
-			return "", ErrRepository
+			return "", fmt.Errorf("%w: save short URL: %w", ErrRepository, err)
 		}
 	}
 
 	return "", ErrUniqueShortURL
 }
 
-func (s Service) Resolve(shortURL string) (string, error) {
+func (s Service) Resolve(ctx context.Context, shortURL string) (string, error) {
 	if shortURL == "" {
 		return "", ErrEmptyURL
 	}
-	fullURL, err := s.storage.FindFullURL(shortURL)
+	fullURL, err := s.storage.FindFullURL(ctx, shortURL)
 	if err != nil {
 		if errors.Is(err, repository.ErrURLNotFound) {
 			return "", ErrURLNotFound

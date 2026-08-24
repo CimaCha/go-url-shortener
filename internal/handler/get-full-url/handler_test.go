@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/zap"
 )
 
 var errHandlerService = errors.New("service error")
@@ -20,7 +21,7 @@ func TestGetFullURLHandler(t *testing.T) {
 	tests := []struct {
 		name         string
 		shortURL     string
-		setup        func(*mocks.MockGetFullURLService)
+		setup        func(*mocks.MockResolver, context.Context)
 		wantStatus   int
 		wantBody     string
 		wantLocation string
@@ -28,8 +29,8 @@ func TestGetFullURLHandler(t *testing.T) {
 		{
 			name:     "stored URL",
 			shortURL: "short",
-			setup: func(urlService *mocks.MockGetFullURLService) {
-				urlService.EXPECT().Resolve("short").Return("https://example.com/path", nil)
+			setup: func(urlService *mocks.MockResolver, ctx context.Context) {
+				urlService.EXPECT().Resolve(ctx, "short").Return("https://example.com/path", nil)
 			},
 			wantStatus:   http.StatusTemporaryRedirect,
 			wantLocation: "https://example.com/path",
@@ -37,16 +38,16 @@ func TestGetFullURLHandler(t *testing.T) {
 		{
 			name:     "missing URL",
 			shortURL: "missing",
-			setup: func(urlService *mocks.MockGetFullURLService) {
-				urlService.EXPECT().Resolve("missing").Return("", service.ErrURLNotFound)
+			setup: func(urlService *mocks.MockResolver, ctx context.Context) {
+				urlService.EXPECT().Resolve(ctx, "missing").Return("", service.ErrURLNotFound)
 			},
 			wantStatus: http.StatusNotFound,
 			wantBody:   "URL not found\n",
 		},
 		{
 			name: "empty URL",
-			setup: func(urlService *mocks.MockGetFullURLService) {
-				urlService.EXPECT().Resolve("").Return("", service.ErrEmptyURL)
+			setup: func(urlService *mocks.MockResolver, ctx context.Context) {
+				urlService.EXPECT().Resolve(ctx, "").Return("", service.ErrEmptyURL)
 			},
 			wantStatus: http.StatusBadRequest,
 			wantBody:   "empty URL\n",
@@ -54,8 +55,8 @@ func TestGetFullURLHandler(t *testing.T) {
 		{
 			name:     "service error",
 			shortURL: "short",
-			setup: func(urlService *mocks.MockGetFullURLService) {
-				urlService.EXPECT().Resolve("short").Return("", errHandlerService)
+			setup: func(urlService *mocks.MockResolver, ctx context.Context) {
+				urlService.EXPECT().Resolve(ctx, "short").Return("", errHandlerService)
 			},
 			wantStatus: http.StatusInternalServerError,
 			wantBody:   "Internal Server Error\n",
@@ -64,14 +65,14 @@ func TestGetFullURLHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			controller := gomock.NewController(t)
-			urlService := mocks.NewMockGetFullURLService(controller)
-			tt.setup(urlService)
-			handler := NewGetFullURLHandler(urlService)
 			request := httptest.NewRequest(http.MethodGet, "/"+tt.shortURL, nil)
 			routeContext := chi.NewRouteContext()
 			routeContext.URLParams.Add("id", tt.shortURL)
 			request = request.WithContext(context.WithValue(request.Context(), chi.RouteCtxKey, routeContext))
+			controller := gomock.NewController(t)
+			urlService := mocks.NewMockResolver(controller)
+			tt.setup(urlService, request.Context())
+			handler := NewGetFullURLHandler(*zap.NewNop(), urlService)
 			response := httptest.NewRecorder()
 
 			handler.ServeHTTP(response, request)

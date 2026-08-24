@@ -1,28 +1,35 @@
 package apishortenurl
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/CimaCha/go-url-shortener/internal/model"
 	"github.com/CimaCha/go-url-shortener/internal/service"
+	"go.uber.org/zap"
 	"io"
 	"net/http"
 )
 
 //go:generate mockgen -source=handler.go -destination=mocks/mock_url_handler.gen.go -package=mocks
 
-type PostAPIShortenService interface {
-	Shorten(fullURL string) (string, error)
+type Shortener interface {
+	Shorten(ctx context.Context, fullURL string) (string, error)
 }
 
 type Handler struct {
-	service             PostAPIShortenService
+	log                 zap.Logger
+	service             Shortener
 	defaultShortAddress string
 }
 
-func NewAPIShortenURLHandler(service PostAPIShortenService, defaultShortAddress string) Handler {
-	return Handler{service: service, defaultShortAddress: defaultShortAddress}
+func NewAPIShortenURLHandler(log zap.Logger, service Shortener, defaultShortAddress string) Handler {
+	return Handler{
+		log:                 log,
+		service:             service,
+		defaultShortAddress: defaultShortAddress,
+	}
 }
 
 func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
@@ -30,19 +37,21 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	var encodedBody model.ShortenURLResponse
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
+		h.log.Error("can't read request body", zap.Error(err))
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	err = json.Unmarshal(body, &decodedBody)
 	if err != nil {
-		http.Error(res, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		http.Error(res, err.Error(), http.StatusBadRequest)
 		return
 	}
-	url, err := h.service.Shorten(decodedBody.URL)
+	url, err := h.service.Shorten(req.Context(), decodedBody.URL)
 	if err != nil {
 		if errors.Is(err, service.ErrEmptyURL) {
 			http.Error(res, err.Error(), http.StatusBadRequest)
 		} else {
+			h.log.Error("can't shorten URL", zap.Error(err))
 			http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		}
 		return

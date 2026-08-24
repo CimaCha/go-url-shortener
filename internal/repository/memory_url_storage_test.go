@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -40,15 +41,16 @@ func TestMemoryURLStorage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
 			storage := NewMemoryURLStorage(make(map[string]string))
 			var setErr error
 			for _, write := range tt.writes {
-				setErr = storage.SaveShortURL(write[0], write[1])
+				setErr = storage.SaveShortURL(ctx, write[0], write[1])
 			}
 
 			assert.ErrorIs(t, setErr, tt.wantSetErr)
 
-			got, err := storage.FindFullURL(tt.shortURL)
+			got, err := storage.FindFullURL(ctx, tt.shortURL)
 			assert.ErrorIs(t, err, tt.wantGetErr)
 			assert.Equal(t, tt.want, got)
 		})
@@ -56,13 +58,24 @@ func TestMemoryURLStorage(t *testing.T) {
 }
 
 func TestMemoryURLStorageSnapshot(t *testing.T) {
-	storage := NewMemoryURLStorage(make(map[string]string))
-	assert.NoError(t, storage.SaveShortURL("short", "https://example.com"))
+	tests := []struct {
+		name string
+	}{
+		{name: "returns independent copy"},
+	}
 
-	snapshot := storage.Snapshot()
-	snapshot["short"] = "changed"
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			storage := NewMemoryURLStorage(make(map[string]string))
+			assert.NoError(t, storage.SaveShortURL(ctx, "short", "https://example.com"))
 
-	got, err := storage.FindFullURL("short")
-	assert.NoError(t, err)
-	assert.Equal(t, "https://example.com", got)
+			snapshot := storage.Snapshot()
+			snapshot["short"] = "changed"
+
+			got, err := storage.FindFullURL(ctx, "short")
+			assert.NoError(t, err)
+			assert.Equal(t, "https://example.com", got)
+		})
+	}
 }

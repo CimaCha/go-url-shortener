@@ -10,6 +10,7 @@
 package mocks
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
@@ -40,30 +41,30 @@ func (m *MockURLStorage) EXPECT() *MockURLStorageMockRecorder {
 }
 
 // FindFullURL mocks base method.
-func (m *MockURLStorage) FindFullURL(shortURL string) (string, error) {
+func (m *MockURLStorage) FindFullURL(ctx context.Context, shortURL string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindFullURL", shortURL)
+	ret := m.ctrl.Call(m, "FindFullURL", ctx, shortURL)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // FindFullURL indicates an expected call of FindFullURL.
-func (mr *MockURLStorageMockRecorder) FindFullURL(shortURL any) *gomock.Call {
+func (mr *MockURLStorageMockRecorder) FindFullURL(ctx, shortURL any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindFullURL", reflect.TypeOf((*MockURLStorage)(nil).FindFullURL), shortURL)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindFullURL", reflect.TypeOf((*MockURLStorage)(nil).FindFullURL), ctx, shortURL)
 }
 
 // SaveShortURL mocks base method.
-func (m *MockURLStorage) SaveShortURL(shortURL, fullURL string) error {
+func (m *MockURLStorage) SaveShortURL(ctx context.Context, shortURL, fullURL string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SaveShortURL", shortURL, fullURL)
+	ret := m.ctrl.Call(m, "SaveShortURL", ctx, shortURL, fullURL)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SaveShortURL indicates an expected call of SaveShortURL.
-func (mr *MockURLStorageMockRecorder) SaveShortURL(shortURL, fullURL any) *gomock.Call {
+func (mr *MockURLStorageMockRecorder) SaveShortURL(ctx, shortURL, fullURL any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveShortURL", reflect.TypeOf((*MockURLStorage)(nil).SaveShortURL), shortURL, fullURL)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveShortURL", reflect.TypeOf((*MockURLStorage)(nil).SaveShortURL), ctx, shortURL, fullURL)
 }
