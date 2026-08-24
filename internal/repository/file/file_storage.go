@@ -41,11 +41,11 @@ func NewFileStorage(filePath string) (*Storage, error) {
 	}, nil
 }
 
-func (f *Storage) SetShortURL(shortURL string, fullURL string) error {
+func (f *Storage) SaveShortURL(shortURL string, fullURL string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	if err := f.memory.SetShortURL(shortURL, fullURL); err != nil {
+	if err := f.memory.SaveShortURL(shortURL, fullURL); err != nil {
 		return err
 	}
 
@@ -67,6 +67,6 @@ func (f *Storage) SetShortURL(shortURL string, fullURL string) error {
 	return nil
 }
 
-func (f *Storage) GetFullURL(shortURL string) (string, error) {
-	return f.memory.GetFullURL(shortURL)
+func (f *Storage) FindFullURL(shortURL string) (string, error) {
+	return f.memory.FindFullURL(shortURL)
 }

@@ -12,7 +12,7 @@ import (
 
 var errStorage = errors.New("storage error")
 
-func TestServiceSetShortURL(t *testing.T) {
+func TestServiceShorten(t *testing.T) {
 	tests := []struct {
 		name    string
 		fullURL string
@@ -25,7 +25,7 @@ func TestServiceSetShortURL(t *testing.T) {
 			fullURL: "https://example.com/path",
 			setup: func(storage *mocks.MockURLStorage, storedShortURL *string) {
 				storage.EXPECT().
-					SetShortURL(gomock.Any(), "https://example.com/path").
+					SaveShortURL(gomock.Any(), "https://example.com/path").
 					DoAndReturn(func(shortURL string, _ string) error {
 						*storedShortURL = shortURL
 						return nil
@@ -37,7 +37,7 @@ func TestServiceSetShortURL(t *testing.T) {
 			fullURL: "https://example.com/path",
 			setup: func(storage *mocks.MockURLStorage, _ *string) {
 				storage.EXPECT().
-					SetShortURL(gomock.Any(), "https://example.com/path").
+					SaveShortURL(gomock.Any(), "https://example.com/path").
 					Return(errStorage)
 			},
 			wantErr: ErrRepository,
@@ -53,7 +53,7 @@ func TestServiceSetShortURL(t *testing.T) {
 				tt.setup(storage, &storedShortURL)
 			}
 
-			got, err := NewService(storage).SetShortURL(tt.fullURL)
+			got, err := NewService(storage).Shorten(tt.fullURL)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 			} else {
@@ -65,7 +65,7 @@ func TestServiceSetShortURL(t *testing.T) {
 	}
 }
 
-func TestServiceGetFullURL(t *testing.T) {
+func TestServiceResolve(t *testing.T) {
 	tests := []struct {
 		name     string
 		shortURL string
@@ -78,7 +78,7 @@ func TestServiceGetFullURL(t *testing.T) {
 			name:     "stored URL",
 			shortURL: "short",
 			setup: func(storage *mocks.MockURLStorage) {
-				storage.EXPECT().GetFullURL("short").Return("https://example.com", nil)
+				storage.EXPECT().FindFullURL("short").Return("https://example.com", nil)
 			},
 			want: "https://example.com",
 		},
@@ -86,7 +86,7 @@ func TestServiceGetFullURL(t *testing.T) {
 			name:     "missing URL",
 			shortURL: "missing",
 			setup: func(storage *mocks.MockURLStorage) {
-				storage.EXPECT().GetFullURL("missing").Return("", repository.ErrURLNotFound)
+				storage.EXPECT().FindFullURL("missing").Return("", repository.ErrURLNotFound)
 			},
 			wantErr: ErrURLNotFound,
 		},
@@ -94,7 +94,7 @@ func TestServiceGetFullURL(t *testing.T) {
 			name:     "storage error",
 			shortURL: "short",
 			setup: func(storage *mocks.MockURLStorage) {
-				storage.EXPECT().GetFullURL("short").Return("", errStorage)
+				storage.EXPECT().FindFullURL("short").Return("", errStorage)
 			},
 			wantErr: ErrRepository,
 		},
@@ -108,7 +108,7 @@ func TestServiceGetFullURL(t *testing.T) {
 				tt.setup(storage)
 			}
 
-			got, err := NewService(storage).GetFullURL(tt.shortURL)
+			got, err := NewService(storage).Resolve(tt.shortURL)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 			} else {

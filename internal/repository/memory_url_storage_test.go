@@ -43,12 +43,12 @@ func TestMemoryURLStorage(t *testing.T) {
 			storage := NewMemoryURLStorage(make(map[string]string))
 			var setErr error
 			for _, write := range tt.writes {
-				setErr = storage.SetShortURL(write[0], write[1])
+				setErr = storage.SaveShortURL(write[0], write[1])
 			}
 
 			assert.ErrorIs(t, setErr, tt.wantSetErr)
 
-			got, err := storage.GetFullURL(tt.shortURL)
+			got, err := storage.FindFullURL(tt.shortURL)
 			assert.ErrorIs(t, err, tt.wantGetErr)
 			assert.Equal(t, tt.want, got)
 		})
@@ -57,12 +57,12 @@ func TestMemoryURLStorage(t *testing.T) {
 
 func TestMemoryURLStorageSnapshot(t *testing.T) {
 	storage := NewMemoryURLStorage(make(map[string]string))
-	assert.NoError(t, storage.SetShortURL("short", "https://example.com"))
+	assert.NoError(t, storage.SaveShortURL("short", "https://example.com"))
 
 	snapshot := storage.Snapshot()
 	snapshot["short"] = "changed"
 
-	got, err := storage.GetFullURL("short")
+	got, err := storage.FindFullURL("short")
 	assert.NoError(t, err)
 	assert.Equal(t, "https://example.com", got)
 }

@@ -25,7 +25,7 @@ func TestAPIShortenURLHandler(t *testing.T) {
 		name            string
 		body            string
 		readError       bool
-		setup           func(*mocks.MockURLService)
+		setup           func(*mocks.MockPostAPIShortenService)
 		wantStatus      int
 		wantBody        string
 		wantJSON        bool
@@ -34,9 +34,9 @@ func TestAPIShortenURLHandler(t *testing.T) {
 		{
 			name: "successful request",
 			body: `{"url":"https://example.com/path"}`,
-			setup: func(urlService *mocks.MockURLService) {
+			setup: func(urlService *mocks.MockPostAPIShortenService) {
 				urlService.EXPECT().
-					SetShortURL("https://example.com/path").
+					Shorten("https://example.com/path").
 					Return("short", nil)
 			},
 			wantStatus:      http.StatusCreated,
@@ -47,8 +47,8 @@ func TestAPIShortenURLHandler(t *testing.T) {
 		{
 			name: "empty URL",
 			body: `{}`,
-			setup: func(urlService *mocks.MockURLService) {
-				urlService.EXPECT().SetShortURL("").Return("", service.ErrEmptyURL)
+			setup: func(urlService *mocks.MockPostAPIShortenService) {
+				urlService.EXPECT().Shorten("").Return("", service.ErrEmptyURL)
 			},
 			wantStatus:      http.StatusBadRequest,
 			wantBody:        "empty URL\n",
@@ -57,8 +57,8 @@ func TestAPIShortenURLHandler(t *testing.T) {
 		{
 			name: "service error",
 			body: `{"url":"https://example.com/path"}`,
-			setup: func(urlService *mocks.MockURLService) {
-				urlService.EXPECT().SetShortURL("https://example.com/path").Return("", errHandlerService)
+			setup: func(urlService *mocks.MockPostAPIShortenService) {
+				urlService.EXPECT().Shorten("https://example.com/path").Return("", errHandlerService)
 			},
 			wantStatus:      http.StatusInternalServerError,
 			wantBody:        "Internal Server Error\n",
@@ -83,7 +83,7 @@ func TestAPIShortenURLHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			controller := gomock.NewController(t)
-			urlService := mocks.NewMockURLService(controller)
+			urlService := mocks.NewMockPostAPIShortenService(controller)
 			if tt.setup != nil {
 				tt.setup(urlService)
 			}

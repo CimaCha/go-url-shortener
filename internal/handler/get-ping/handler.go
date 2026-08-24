@@ -27,3 +27,9 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	}
 	res.WriteHeader(http.StatusOK)
 }
+
+type PingFunc func(context.Context) error
+
+func (f PingFunc) Ping(ctx context.Context) error {
+	return f(ctx)
+}

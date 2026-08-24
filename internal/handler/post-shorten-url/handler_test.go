@@ -25,7 +25,7 @@ func TestShortenURLHandler(t *testing.T) {
 		name            string
 		body            string
 		readError       bool
-		setup           func(*mocks.MockURLService)
+		setup           func(*mocks.MockPostShortenService)
 		wantStatus      int
 		wantBody        string
 		wantContentType string
@@ -33,9 +33,9 @@ func TestShortenURLHandler(t *testing.T) {
 		{
 			name: "successful request",
 			body: "https://example.com/path",
-			setup: func(urlService *mocks.MockURLService) {
+			setup: func(urlService *mocks.MockPostShortenService) {
 				urlService.EXPECT().
-					SetShortURL("https://example.com/path").
+					Shorten("https://example.com/path").
 					Return("short", nil)
 			},
 			wantStatus:      http.StatusCreated,
@@ -44,8 +44,8 @@ func TestShortenURLHandler(t *testing.T) {
 		},
 		{
 			name: "empty URL",
-			setup: func(urlService *mocks.MockURLService) {
-				urlService.EXPECT().SetShortURL("").Return("", service.ErrEmptyURL)
+			setup: func(urlService *mocks.MockPostShortenService) {
+				urlService.EXPECT().Shorten("").Return("", service.ErrEmptyURL)
 			},
 			wantStatus:      http.StatusBadRequest,
 			wantBody:        "empty URL\n",
@@ -54,8 +54,8 @@ func TestShortenURLHandler(t *testing.T) {
 		{
 			name: "service error",
 			body: "https://example.com/path",
-			setup: func(urlService *mocks.MockURLService) {
-				urlService.EXPECT().SetShortURL("https://example.com/path").Return("", errHandlerService)
+			setup: func(urlService *mocks.MockPostShortenService) {
+				urlService.EXPECT().Shorten("https://example.com/path").Return("", errHandlerService)
 			},
 			wantStatus:      http.StatusInternalServerError,
 			wantBody:        "Internal Server Error\n",
@@ -73,7 +73,7 @@ func TestShortenURLHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			controller := gomock.NewController(t)
-			urlService := mocks.NewMockURLService(controller)
+			urlService := mocks.NewMockPostShortenService(controller)
 			if tt.setup != nil {
 				tt.setup(urlService)
 			}

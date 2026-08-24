@@ -70,11 +70,11 @@ func TestNewFileStorage(t *testing.T) {
 			}
 			require.NoError(t, err)
 			for shortURL, wantFullURL := range tt.want {
-				got, getErr := storage.GetFullURL(shortURL)
+				got, getErr := storage.FindFullURL(shortURL)
 				require.NoError(t, getErr)
 				assert.Equal(t, wantFullURL, got)
 			}
-			_, getErr := storage.GetFullURL("missing")
+			_, getErr := storage.FindFullURL("missing")
 			assert.ErrorIs(t, getErr, repository.ErrURLNotFound)
 		})
 	}
@@ -120,7 +120,7 @@ func TestStorageSetShortURL(t *testing.T) {
 
 			var setErr error
 			for _, write := range tt.writes {
-				setErr = storage.SetShortURL(write[0], write[1])
+				setErr = storage.SaveShortURL(write[0], write[1])
 			}
 
 			assert.ErrorIs(t, setErr, tt.wantSetErr)
@@ -152,10 +152,10 @@ func TestStorageSetShortURLWriteFailure(t *testing.T) {
 			require.NoError(t, err)
 			storage.writer = NewWriter(filepath.Join(root, "missing", "storage.json"))
 
-			err = storage.SetShortURL("short", "https://example.com")
+			err = storage.SaveShortURL("short", "https://example.com")
 
 			assert.ErrorIs(t, err, ErrOpenFileForWrite)
-			got, getErr := storage.GetFullURL("short")
+			got, getErr := storage.FindFullURL("short")
 			require.NoError(t, getErr)
 			assert.Equal(t, "https://example.com", got)
 		})
@@ -181,10 +181,10 @@ func TestStorageUsesMemoryAsSourceOfTruth(t *testing.T) {
 				{UUID: "99", ShortURL: "external", OriginalURL: "https://external.example"},
 			})
 
-			got, err := storage.GetFullURL("first")
+			got, err := storage.FindFullURL("first")
 			require.NoError(t, err)
 			assert.Equal(t, "https://first.example", got)
-			_, err = storage.GetFullURL("external")
+			_, err = storage.FindFullURL("external")
 			assert.ErrorIs(t, err, repository.ErrURLNotFound)
 		})
 	}

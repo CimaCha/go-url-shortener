@@ -36,7 +36,7 @@ func TestDBConnectionPingHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			controller := gomock.NewController(t)
-			dbPool := mocks.NewMockPinger(controller)
+			dbPool := mocks.NewMockGetPingService(controller)
 			request := httptest.NewRequest(http.MethodGet, "/ping", nil)
 			request = request.WithContext(context.WithValue(request.Context(), contextKey{}, "request"))
 			dbPool.EXPECT().Ping(request.Context()).Return(tt.pingError)

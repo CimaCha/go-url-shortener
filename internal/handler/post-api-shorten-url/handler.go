@@ -13,7 +13,7 @@ import (
 //go:generate mockgen -source=handler.go -destination=mocks/mock_url_handler.gen.go -package=mocks
 
 type PostAPIShortenService interface {
-	SetShortURL(fullURL string) (string, error)
+	Shorten(fullURL string) (string, error)
 }
 
 type Handler struct {
@@ -38,7 +38,7 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
-	url, err := h.service.SetShortURL(decodedBody.URL)
+	url, err := h.service.Shorten(decodedBody.URL)
 	if err != nil {
 		if errors.Is(err, service.ErrEmptyURL) {
 			http.Error(res, err.Error(), http.StatusBadRequest)

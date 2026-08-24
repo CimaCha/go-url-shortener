@@ -39,31 +39,31 @@ func (m *MockURLStorage) EXPECT() *MockURLStorageMockRecorder {
 	return m.recorder
 }
 
-// GetFullURL mocks base method.
-func (m *MockURLStorage) GetFullURL(shortURL string) (string, error) {
+// FindFullURL mocks base method.
+func (m *MockURLStorage) FindFullURL(shortURL string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetFullURL", shortURL)
+	ret := m.ctrl.Call(m, "FindFullURL", shortURL)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetFullURL indicates an expected call of GetFullURL.
-func (mr *MockURLStorageMockRecorder) GetFullURL(shortURL any) *gomock.Call {
+// FindFullURL indicates an expected call of FindFullURL.
+func (mr *MockURLStorageMockRecorder) FindFullURL(shortURL any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFullURL", reflect.TypeOf((*MockURLStorage)(nil).GetFullURL), shortURL)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindFullURL", reflect.TypeOf((*MockURLStorage)(nil).FindFullURL), shortURL)
 }
 
-// SetShortURL mocks base method.
-func (m *MockURLStorage) SetShortURL(shortURL, fullURL string) error {
+// SaveShortURL mocks base method.
+func (m *MockURLStorage) SaveShortURL(shortURL, fullURL string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetShortURL", shortURL, fullURL)
+	ret := m.ctrl.Call(m, "SaveShortURL", shortURL, fullURL)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// SetShortURL indicates an expected call of SetShortURL.
-func (mr *MockURLStorageMockRecorder) SetShortURL(shortURL, fullURL any) *gomock.Call {
+// SaveShortURL indicates an expected call of SaveShortURL.
+func (mr *MockURLStorageMockRecorder) SaveShortURL(shortURL, fullURL any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetShortURL", reflect.TypeOf((*MockURLStorage)(nil).SetShortURL), shortURL, fullURL)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveShortURL", reflect.TypeOf((*MockURLStorage)(nil).SaveShortURL), shortURL, fullURL)
 }

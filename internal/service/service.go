@@ -27,13 +27,13 @@ func NewService(storage URLStorage) Service {
 	}
 }
 
-func (s Service) SetShortURL(fullURL string) (string, error) {
+func (s Service) Shorten(fullURL string) (string, error) {
 	if fullURL == "" {
 		return "", ErrEmptyURL
 	}
 	for range maxShortURLAttempts {
 		shortURL := rand.Text()
-		err := s.storage.SetShortURL(shortURL, fullURL)
+		err := s.storage.SaveShortURL(shortURL, fullURL)
 		if err == nil {
 			return shortURL, nil
 		}
@@ -45,11 +45,11 @@ func (s Service) SetShortURL(fullURL string) (string, error) {
 	return "", ErrUniqueShortURL
 }
 
-func (s Service) GetFullURL(shortURL string) (string, error) {
+func (s Service) Resolve(shortURL string) (string, error) {
 	if shortURL == "" {
 		return "", ErrEmptyURL
 	}
-	fullURL, err := s.storage.GetFullURL(shortURL)
+	fullURL, err := s.storage.FindFullURL(shortURL)
 	if err != nil {
 		if errors.Is(err, repository.ErrURLNotFound) {
 			return "", ErrURLNotFound

@@ -15,41 +15,41 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockURLService is a mock of URLService interface.
-type MockURLService struct {
+// MockPostShortenService is a mock of PostShortenService interface.
+type MockPostShortenService struct {
 	ctrl     *gomock.Controller
-	recorder *MockURLServiceMockRecorder
+	recorder *MockPostShortenServiceMockRecorder
 	isgomock struct{}
 }
 
-// MockURLServiceMockRecorder is the mock recorder for MockURLService.
-type MockURLServiceMockRecorder struct {
-	mock *MockURLService
+// MockPostShortenServiceMockRecorder is the mock recorder for MockPostShortenService.
+type MockPostShortenServiceMockRecorder struct {
+	mock *MockPostShortenService
 }
 
-// NewMockURLService creates a new mock instance.
-func NewMockURLService(ctrl *gomock.Controller) *MockURLService {
-	mock := &MockURLService{ctrl: ctrl}
-	mock.recorder = &MockURLServiceMockRecorder{mock}
+// NewMockPostShortenService creates a new mock instance.
+func NewMockPostShortenService(ctrl *gomock.Controller) *MockPostShortenService {
+	mock := &MockPostShortenService{ctrl: ctrl}
+	mock.recorder = &MockPostShortenServiceMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockURLService) EXPECT() *MockURLServiceMockRecorder {
+func (m *MockPostShortenService) EXPECT() *MockPostShortenServiceMockRecorder {
 	return m.recorder
 }
 
-// SetShortURL mocks base method.
-func (m *MockURLService) SetShortURL(fullURL string) (string, error) {
+// Shorten mocks base method.
+func (m *MockPostShortenService) Shorten(fullURL string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetShortURL", fullURL)
+	ret := m.ctrl.Call(m, "Shorten", fullURL)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// SetShortURL indicates an expected call of SetShortURL.
-func (mr *MockURLServiceMockRecorder) SetShortURL(fullURL any) *gomock.Call {
+// Shorten indicates an expected call of Shorten.
+func (mr *MockPostShortenServiceMockRecorder) Shorten(fullURL any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetShortURL", reflect.TypeOf((*MockURLService)(nil).SetShortURL), fullURL)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Shorten", reflect.TypeOf((*MockPostShortenService)(nil).Shorten), fullURL)
 }

@@ -11,7 +11,7 @@ import (
 //go:generate mockgen -source=handler.go -destination=mocks/mock_url_handler.gen.go -package=mocks
 
 type GetFullURLService interface {
-	GetFullURL(shortURL string) (string, error)
+	Resolve(shortURL string) (string, error)
 }
 
 type Handler struct {
@@ -26,7 +26,7 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 	id := chi.URLParam(req, "id")
 
-	fullURL, err := h.service.GetFullURL(id)
+	fullURL, err := h.service.Resolve(id)
 	if err != nil {
 		if errors.Is(err, service.ErrURLNotFound) {
 			http.Error(res, err.Error(), http.StatusNotFound)
