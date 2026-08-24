@@ -3,26 +3,70 @@ package database_storage
 import (
 	"context"
 	"errors"
+	"fmt"
+	"time"
+
+	"github.com/CimaCha/go-url-shortener/internal/repository"
+	"github.com/CimaCha/go-url-shortener/migrations"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var (
-	ErrParseConfig   = errors.New("failed to parse config")
+	ErrPingDataBase  = errors.New("failed to ping database")
 	ErrCreateNewPool = errors.New("failed to create new pool")
 )
 
 type Storage struct {
-	Db *pgxpool.Pool
+	ctx  context.Context
+	Pool *pgxpool.Pool
 }
 
 func NewDatabaseStorage(ctx context.Context, databaseURL string) (*Storage, error) {
-	poolConfig, err := pgxpool.ParseConfig(databaseURL)
+	pool, err := pgxpool.New(ctx, databaseURL)
 	if err != nil {
-		return nil, ErrParseConfig
+		return nil, fmt.Errorf("%w: %w", ErrCreateNewPool, err)
 	}
-	db, err := pgxpool.NewWithConfig(ctx, poolConfig)
+	pingCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	if err = pool.Ping(pingCtx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("%w: %w", ErrPingDataBase, err)
+	}
+	if err = migrations.Up(ctx, pool); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("migrate database: %w", err)
+	}
+	return &Storage{ctx: ctx, Pool: pool}, nil
+}
+
+func (s Storage) SaveShortURL(shortURL string, fullURL string) error {
+	_, err := s.Pool.Exec(s.ctx, "INSERT INTO urls(short_url, full_url) VALUES($1,$2)", shortURL, fullURL)
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		return repository.ErrShortURLExists
+	}
+	return err
+}
+
+func (s Storage) FindFullURL(shortURL string) (string, error) {
+	var fullURL string
+	err := s.Pool.QueryRow(s.ctx, "SELECT full_url FROM urls WHERE short_url = $1", shortURL).Scan(&fullURL)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", repository.ErrURLNotFound
+	}
 	if err != nil {
-		return nil, ErrCreateNewPool
+		return "", err
 	}
-	return &Storage{Db: db}, nil
+	return fullURL, nil
+}
+
+func (s Storage) Close() {
+	s.Pool.Close()
+}
+
+func (s Storage) Ping(ctx context.Context) error {
+	return s.Pool.Ping(ctx)
 }

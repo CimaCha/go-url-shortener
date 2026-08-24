@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"errors"
+	"github.com/CimaCha/go-url-shortener/internal/repository"
 	database_storage "github.com/CimaCha/go-url-shortener/internal/repository/database-storage"
+	"github.com/CimaCha/go-url-shortener/internal/repository/file"
 	"log"
 	"net/http"
 	"os"
@@ -14,7 +16,6 @@ import (
 	apishortenurl "github.com/CimaCha/go-url-shortener/internal/handler/post-api-shorten-url"
 	"github.com/CimaCha/go-url-shortener/internal/handler/post-shorten-url"
 	"github.com/CimaCha/go-url-shortener/internal/logger"
-	"github.com/CimaCha/go-url-shortener/internal/repository/file"
 	shortenerrouter "github.com/CimaCha/go-url-shortener/internal/router"
 	"github.com/CimaCha/go-url-shortener/internal/service"
 	"go.uber.org/zap"
@@ -43,33 +44,50 @@ func run() error {
 	cfg, err := config.New()
 	if err != nil {
 		initializedLogger.Error("cannot parse config")
-		return fmt.Errorf("parse config: %w", err)
-	}
-
-	fileStorage, err := file.NewFileStorage(cfg.FilePath)
-	if err != nil {
-		initializedLogger.Error("new file storage error", zap.Error(err))
-		return fmt.Errorf("open file storage: %w", err)
-	}
-
-	storage, err := database_storage.NewDatabaseStorage(ctx, cfg.DatabaseURL)
-	if err != nil {
 		return err
 	}
-	defer storage.Db.Close()
-	shortenURLService := service.NewService(fileStorage)
 
-	shortenURLHandler := shortenurl.NewShortenURLHandler(shortenURLService, cfg.BasicShortenAddress)
-	apiShortenURLHandler := apishortenurl.NewAPIShortenURLHandler(shortenURLService, cfg.BasicShortenAddress)
-	getFullURLHandler := fullurl.NewGetFullURLHandler(shortenURLService)
-	pingConnectionHandler := getping.NewDBConnectionPingHandler(storage.Db)
+	var storage service.URLStorage
+	var pingHandler http.Handler = getping.NewDBConnectionPingHandler(
+		getping.PingFunc(func(context.Context) error {
+			return errors.New("database is not configured")
+		}),
+	)
+
+	switch {
+	case cfg.DatabaseURL != "":
+		dbStorage, err := database_storage.NewDatabaseStorage(ctx, cfg.DatabaseURL)
+		if err != nil {
+			return err
+		}
+		defer dbStorage.Close()
+
+		storage = dbStorage
+		pingHandler = getping.NewDBConnectionPingHandler(dbStorage)
+
+	case cfg.FilePath != "":
+		fileStorage, err := file.NewFileStorage(cfg.FilePath)
+		if err != nil {
+			return err
+		}
+		storage = fileStorage
+
+	default:
+		storage = repository.NewMemoryURLStorage(make(map[string]string))
+	}
+
+	urlService := service.NewService(storage)
+
+	shortenURLHandler := shortenurl.NewShortenURLHandler(urlService, cfg.BasicShortenAddress)
+	apiShortenURLHandler := apishortenurl.NewAPIShortenURLHandler(urlService, cfg.BasicShortenAddress)
+	getFullURLHandler := fullurl.NewGetFullURLHandler(urlService)
 
 	router := shortenerrouter.New(
 		initializedLogger.With(zap.String("layer", "router")),
 		shortenURLHandler,
 		apiShortenURLHandler,
 		getFullURLHandler,
-		pingConnectionHandler)
+		pingHandler)
 
 	err = http.ListenAndServe(cfg.Address, router)
 	if err != nil {
