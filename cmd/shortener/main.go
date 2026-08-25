@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	apishortenbatch "github.com/CimaCha/go-url-shortener/internal/handler/post-api-shorten-batch"
 	"github.com/CimaCha/go-url-shortener/internal/repository"
 	database_storage "github.com/CimaCha/go-url-shortener/internal/repository/database-storage"
 	"github.com/CimaCha/go-url-shortener/internal/repository/file"
@@ -74,13 +75,15 @@ func run(log zap.Logger) error {
 	shortenURLHandler := shortenurl.NewShortenURLHandler(*log.With(zap.String("handler", "shorten URL")), urlService, cfg.BasicShortenAddress)
 	apiShortenURLHandler := apishortenurl.NewAPIShortenURLHandler(*log.With(zap.String("handler", "api shorten URL")), urlService, cfg.BasicShortenAddress)
 	getFullURLHandler := fullurl.NewGetFullURLHandler(*log.With(zap.String("handler", "get full URL")), urlService)
+	apiShortenBatchHandler := apishortenbatch.NewAPIShortenBatchHandler(*log.With(zap.String("handler", "api shorten batch")), urlService, cfg.BasicShortenAddress)
 
 	router := shortenerrouter.New(
 		log.With(zap.String("layer", "router")),
 		shortenURLHandler,
 		apiShortenURLHandler,
 		getFullURLHandler,
-		pingHandler)
+		pingHandler,
+		apiShortenBatchHandler)
 
 	err = http.ListenAndServe(cfg.Address, router)
 	if err != nil {
