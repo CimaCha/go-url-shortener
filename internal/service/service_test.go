@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/CimaCha/go-url-shortener/internal/model"
 	"github.com/CimaCha/go-url-shortener/internal/repository"
 	"github.com/CimaCha/go-url-shortener/internal/service/mocks"
 	"github.com/stretchr/testify/assert"
@@ -97,6 +98,106 @@ func TestServiceShorten(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestServiceShortenBatchReturnsStoredURLs(t *testing.T) {
+	ctx := context.Background()
+	controller := gomock.NewController(t)
+	storage := mocks.NewMockURLStorage(controller)
+	var stored []*model.URLRecord
+	storage.EXPECT().
+		SaveShortUrlBatch(ctx, gomock.Any()).
+		DoAndReturn(func(_ context.Context, records []*model.URLRecord) error {
+			stored = records
+			return nil
+		})
+
+	got, err := NewService(storage).ShortenBatch(ctx, []*model.OriginalURLRecord{
+		{CorrelationId: "first", OriginalURL: "https://example.com/first"},
+		{CorrelationId: "second", OriginalURL: "https://example.com/second"},
+	})
+
+	assert.NoError(t, err)
+	assert.Len(t, got, 2)
+	assert.Len(t, stored, 2)
+	for i := range got {
+		assert.Equal(t, stored[i].CorrelationId, got[i].CorrelationId)
+		assert.Equal(t, stored[i].ShortURL, got[i].ShortURL)
+	}
+}
+
+func TestServiceShortenBatchRegeneratesURLsAfterCollision(t *testing.T) {
+	ctx := context.Background()
+	controller := gomock.NewController(t)
+	storage := mocks.NewMockURLStorage(controller)
+	attempts := make([][]string, 0, 2)
+	storage.EXPECT().
+		SaveShortUrlBatch(ctx, gomock.Any()).
+		DoAndReturn(func(_ context.Context, records []*model.URLRecord) error {
+			shortURLs := make([]string, len(records))
+			for i, record := range records {
+				shortURLs[i] = record.ShortURL
+			}
+			attempts = append(attempts, shortURLs)
+			if len(attempts) == 1 {
+				return repository.ErrShortURLExists
+			}
+			return nil
+		}).
+		Times(2)
+
+	got, err := NewService(storage).ShortenBatch(ctx, []*model.OriginalURLRecord{
+		{CorrelationId: "first", OriginalURL: "https://example.com/first"},
+		{CorrelationId: "second", OriginalURL: "https://example.com/second"},
+	})
+
+	assert.NoError(t, err)
+	assert.Len(t, attempts, 2)
+	assert.NotEqual(t, attempts[0], attempts[1])
+	assert.Equal(t, attempts[1][0], got[0].ShortURL)
+	assert.Equal(t, attempts[1][1], got[1].ShortURL)
+}
+
+func TestServiceShortenBatchReturnsErrorAfterMaximumCollisions(t *testing.T) {
+	ctx := context.Background()
+	controller := gomock.NewController(t)
+	storage := mocks.NewMockURLStorage(controller)
+	storage.EXPECT().
+		SaveShortUrlBatch(ctx, gomock.Any()).
+		Return(repository.ErrShortURLExists).
+		Times(maxShortURLAttempts)
+
+	got, err := NewService(storage).ShortenBatch(ctx, []*model.OriginalURLRecord{
+		{CorrelationId: "first", OriginalURL: "https://example.com/first"},
+	})
+
+	assert.ErrorIs(t, err, ErrUniqueShortURL)
+	assert.Nil(t, got)
+}
+
+func TestServiceShortenBatchReturnsRepositoryError(t *testing.T) {
+	ctx := context.Background()
+	controller := gomock.NewController(t)
+	storage := mocks.NewMockURLStorage(controller)
+	storage.EXPECT().SaveShortUrlBatch(ctx, gomock.Any()).Return(errStorage)
+
+	got, err := NewService(storage).ShortenBatch(ctx, []*model.OriginalURLRecord{
+		{CorrelationId: "first", OriginalURL: "https://example.com/first"},
+	})
+
+	assert.ErrorIs(t, err, ErrRepository)
+	assert.ErrorIs(t, err, errStorage)
+	assert.Nil(t, got)
+}
+
+func TestServiceShortenBatchRejectsEmptyList(t *testing.T) {
+	controller := gomock.NewController(t)
+	storage := mocks.NewMockURLStorage(controller)
+
+	got, err := NewService(storage).ShortenBatch(context.Background(), nil)
+
+	assert.ErrorIs(t, err, ErrEmptyURLList)
+	assert.Nil(t, got)
 }
 
 func TestServiceResolve(t *testing.T) {

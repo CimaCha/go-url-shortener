@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/CimaCha/go-url-shortener/internal/model"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -78,4 +79,34 @@ func TestMemoryURLStorageSnapshot(t *testing.T) {
 			assert.Equal(t, "https://example.com", got)
 		})
 	}
+}
+
+func TestMemoryURLStorageBatchCollisionIsAtomic(t *testing.T) {
+	ctx := context.Background()
+	storage := NewMemoryURLStorage(map[string]string{
+		"existing": "https://example.com/existing",
+	})
+
+	err := storage.SaveShortUrlBatch(ctx, []*model.URLRecord{
+		{ShortURL: "new", OriginalURL: "https://example.com/new"},
+		{ShortURL: "existing", OriginalURL: "https://example.com/collision"},
+	})
+
+	assert.ErrorIs(t, err, ErrShortURLExists)
+	assert.Equal(t, map[string]string{
+		"existing": "https://example.com/existing",
+	}, storage.Snapshot())
+}
+
+func TestMemoryURLStorageBatchRejectsInternalDuplicate(t *testing.T) {
+	ctx := context.Background()
+	storage := NewMemoryURLStorage(make(map[string]string))
+
+	err := storage.SaveShortUrlBatch(ctx, []*model.URLRecord{
+		{ShortURL: "duplicate", OriginalURL: "https://example.com/first"},
+		{ShortURL: "duplicate", OriginalURL: "https://example.com/second"},
+	})
+
+	assert.ErrorIs(t, err, ErrShortURLExists)
+	assert.Empty(t, storage.Snapshot())
 }

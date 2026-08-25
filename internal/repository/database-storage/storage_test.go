@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/CimaCha/go-url-shortener/internal/model"
 	"github.com/CimaCha/go-url-shortener/internal/repository"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -49,6 +50,19 @@ func TestStorage(t *testing.T) {
 				require.NoError(t, storage.SaveShortURL(ctx, "short", "https://example.com"))
 				err := storage.SaveShortURL(ctx, "short", "https://other.example.com")
 				require.ErrorIs(t, err, repository.ErrShortURLExists)
+			},
+		},
+		{
+			name: "rolls back batch and maps duplicate error",
+			run: func(t *testing.T, ctx context.Context, storage *Storage) {
+				require.NoError(t, storage.SaveShortURL(ctx, "existing", "https://example.com/existing"))
+				err := storage.SaveShortUrlBatch(ctx, []*model.URLRecord{
+					{ShortURL: "new", OriginalURL: "https://example.com/new"},
+					{ShortURL: "existing", OriginalURL: "https://example.com/collision"},
+				})
+				require.ErrorIs(t, err, repository.ErrShortURLExists)
+				_, err = storage.FindFullURL(ctx, "new")
+				require.ErrorIs(t, err, repository.ErrURLNotFound)
 			},
 		},
 	}

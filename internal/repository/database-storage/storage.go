@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/CimaCha/go-url-shortener/internal/model"
 	"github.com/CimaCha/go-url-shortener/internal/repository"
 	"github.com/CimaCha/go-url-shortener/migrations"
 	"github.com/jackc/pgx/v5"
@@ -68,4 +69,27 @@ func (s Storage) Close() {
 
 func (s Storage) Ping(ctx context.Context) error {
 	return s.Pool.Ping(ctx)
+}
+
+func (s Storage) SaveShortUrlBatch(ctx context.Context, URLRecords []*model.URLRecord) error {
+	// начинаем транзакцию
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback(ctx)
+
+	for _, URLRecord := range URLRecords {
+		_, err = tx.Exec(ctx, "INSERT INTO urls(short_url, full_url) VALUES($1,$2)", URLRecord.ShortURL, URLRecord.OriginalURL)
+		if err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+				return repository.ErrShortURLExists
+			}
+			return err
+		}
+	}
+	// завершаем транзакцию
+	return tx.Commit(ctx)
 }

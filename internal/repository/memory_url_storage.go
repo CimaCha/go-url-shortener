@@ -5,6 +5,8 @@ import (
 	"errors"
 	"maps"
 	"sync"
+
+	"github.com/CimaCha/go-url-shortener/internal/model"
 )
 
 var (
@@ -49,4 +51,20 @@ func (s *MemoryURLStorage) Snapshot() map[string]string {
 	defer s.mu.RUnlock()
 
 	return maps.Clone(s.urls)
+}
+
+func (s *MemoryURLStorage) SaveShortUrlBatch(ctx context.Context, URLRecords []*model.URLRecord) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	urls := maps.Clone(s.urls)
+	for _, record := range URLRecords {
+		_, ok := urls[record.ShortURL]
+		if ok {
+			return ErrShortURLExists
+		}
+		urls[record.ShortURL] = record.OriginalURL
+	}
+	s.urls = urls
+	return nil
 }

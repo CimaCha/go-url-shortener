@@ -13,6 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	model "github.com/CimaCha/go-url-shortener/internal/model"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -67,4 +68,18 @@ func (m *MockURLStorage) SaveShortURL(ctx context.Context, shortURL, fullURL str
 func (mr *MockURLStorageMockRecorder) SaveShortURL(ctx, shortURL, fullURL any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveShortURL", reflect.TypeOf((*MockURLStorage)(nil).SaveShortURL), ctx, shortURL, fullURL)
+}
+
+// SaveShortUrlBatch mocks base method.
+func (m *MockURLStorage) SaveShortUrlBatch(ctx context.Context, URLRecords []*model.URLRecord) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SaveShortUrlBatch", ctx, URLRecords)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SaveShortUrlBatch indicates an expected call of SaveShortUrlBatch.
+func (mr *MockURLStorageMockRecorder) SaveShortUrlBatch(ctx, URLRecords any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveShortUrlBatch", reflect.TypeOf((*MockURLStorage)(nil).SaveShortUrlBatch), ctx, URLRecords)
 }
