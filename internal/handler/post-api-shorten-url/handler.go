@@ -34,7 +34,6 @@ func NewAPIShortenURLHandler(log zap.Logger, service Shortener, defaultShortAddr
 
 func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	var decodedBody model.ShortenURLRequest
-	var encodedBody model.ShortenURLResponse
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
 		h.log.Error("can't read request body", zap.Error(err))
@@ -49,20 +48,7 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	url, err := h.service.Shorten(req.Context(), decodedBody.URL)
 	if err != nil {
 		if errors.Is(err, service.ErrFullURLExists) {
-			finalURL := fmt.Sprintf("%s/%s", h.defaultShortAddress, url)
-			res.WriteHeader(http.StatusConflict)
-			res.Header().Set("Content-Type", "application/json")
-			encodedBody.Result = finalURL
-			responseBody, err := json.Marshal(encodedBody)
-			if err != nil {
-				http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-				return
-			}
-			_, err = res.Write(responseBody)
-			if err != nil {
-				http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-				return
-			}
+			res = h.createResponse(res, url, http.StatusConflict)
 			return
 		}
 		if errors.Is(err, service.ErrEmptyURL) {
@@ -74,14 +60,19 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	finalURL := fmt.Sprintf("%s/%s", h.defaultShortAddress, url)
-	encodedBody.Result = finalURL
+	res = h.createResponse(res, url, http.StatusCreated)
+}
+
+func (h Handler) createResponse(res http.ResponseWriter, url string, status int) http.ResponseWriter {
+	var encodedBody model.ShortenURLResponse
+	encodedBody.Result = fmt.Sprintf("%s/%s", h.defaultShortAddress, url)
 	res.Header().Set("Content-Type", "application/json")
-	res.WriteHeader(http.StatusCreated)
+	res.WriteHeader(status)
 	responseBody, err := json.Marshal(encodedBody)
 	if err != nil {
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
+		return res
 	}
 	_, _ = res.Write(responseBody)
+	return res
 }

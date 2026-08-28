@@ -42,14 +42,7 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	url, err := h.service.Shorten(req.Context(), string(body))
 	if err != nil {
 		if errors.Is(err, service.ErrFullURLExists) {
-			finalURL := fmt.Sprintf("%s/%s", h.defaultShortAddress, url)
-			res.WriteHeader(http.StatusConflict)
-			res.Header().Set("Content-Type", "application/json")
-			_, err = res.Write([]byte(finalURL))
-			if err != nil {
-				http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-				return
-			}
+			res = h.createResponse(res, url, http.StatusConflict)
 			return
 		}
 		if errors.Is(err, service.ErrEmptyURL) {
@@ -61,8 +54,17 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	res = h.createResponse(res, url, http.StatusCreated)
+}
+
+func (h Handler) createResponse(res http.ResponseWriter, url string, status int) http.ResponseWriter {
 	finalURL := fmt.Sprintf("%s/%s", h.defaultShortAddress, url)
 	res.Header().Set("Content-Type", "text/plain")
-	res.WriteHeader(http.StatusCreated)
-	_, _ = res.Write([]byte(finalURL))
+	res.WriteHeader(status)
+	_, err := res.Write([]byte(finalURL))
+	if err != nil {
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return res
+	}
+	return res
 }
