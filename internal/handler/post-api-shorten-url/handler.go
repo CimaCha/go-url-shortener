@@ -52,7 +52,8 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 			finalURL := fmt.Sprintf("%s/%s", h.defaultShortAddress, url)
 			res.WriteHeader(http.StatusConflict)
 			res.Header().Set("Content-Type", "application/json")
-			responseBody, err := json.Marshal(finalURL)
+			encodedBody.Result = finalURL
+			responseBody, err := json.Marshal(encodedBody)
 			if err != nil {
 				http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				return
