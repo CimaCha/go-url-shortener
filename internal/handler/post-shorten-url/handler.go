@@ -41,6 +41,17 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	}
 	url, err := h.service.Shorten(req.Context(), string(body))
 	if err != nil {
+		if errors.Is(err, service.ErrFullURLExists) {
+			finalURL := fmt.Sprintf("%s/%s", h.defaultShortAddress, url)
+			res.WriteHeader(http.StatusConflict)
+			res.Header().Set("Content-Type", "application/json")
+			_, err = res.Write([]byte(finalURL))
+			if err != nil {
+				http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				return
+			}
+			return
+		}
 		if errors.Is(err, service.ErrEmptyURL) {
 			http.Error(res, err.Error(), http.StatusBadRequest)
 		} else {

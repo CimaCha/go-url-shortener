@@ -48,6 +48,22 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	}
 	url, err := h.service.Shorten(req.Context(), decodedBody.URL)
 	if err != nil {
+		if errors.Is(err, service.ErrFullURLExists) {
+			finalURL := fmt.Sprintf("%s/%s", h.defaultShortAddress, url)
+			res.WriteHeader(http.StatusConflict)
+			res.Header().Set("Content-Type", "application/json")
+			responseBody, err := json.Marshal(finalURL)
+			if err != nil {
+				http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				return
+			}
+			_, err = res.Write(responseBody)
+			if err != nil {
+				http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				return
+			}
+			return
+		}
 		if errors.Is(err, service.ErrEmptyURL) {
 			http.Error(res, err.Error(), http.StatusBadRequest)
 		} else {
@@ -63,6 +79,7 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	res.WriteHeader(http.StatusCreated)
 	responseBody, err := json.Marshal(encodedBody)
 	if err != nil {
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	_, _ = res.Write(responseBody)

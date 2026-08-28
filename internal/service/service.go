@@ -13,11 +13,11 @@ import (
 const maxShortURLAttempts = 5
 
 var (
-	ErrEmptyURL     = errors.New("empty URL")
-	ErrEmptyURLList = errors.New("empty URL list")
-	ErrURLNotFound  = errors.New("URL not found")
-	ErrRepository   = errors.New("error in repository")
-
+	ErrEmptyURL       = errors.New("empty URL")
+	ErrEmptyURLList   = errors.New("empty URL list")
+	ErrURLNotFound    = errors.New("URL not found")
+	ErrRepository     = errors.New("error in repository")
+	ErrFullURLExists  = errors.New("full URL already exists")
 	ErrUniqueShortURL = errors.New("can't create unique short URL")
 )
 
@@ -40,6 +40,13 @@ func (s Service) Shorten(ctx context.Context, fullURL string) (string, error) {
 		err := s.storage.SaveShortURL(ctx, shortURL, fullURL)
 		if err == nil {
 			return shortURL, nil
+		}
+		if errors.Is(err, repository.ErrFullURLExists) {
+			findShortURL, err := s.storage.FindShortURL(ctx, fullURL)
+			if err != nil {
+				return "", err
+			}
+			return findShortURL, ErrFullURLExists
 		}
 		if !errors.Is(err, repository.ErrShortURLExists) {
 			return "", fmt.Errorf("%w: save short URL: %w", ErrRepository, err)

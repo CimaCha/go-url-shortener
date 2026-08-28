@@ -12,24 +12,33 @@ import (
 var (
 	ErrURLNotFound    = errors.New("URL not found")
 	ErrShortURLExists = errors.New("short URL already exists")
+	ErrFullURLExists  = errors.New("full URL already exists")
 )
 
 type MemoryURLStorage struct {
-	mu   sync.RWMutex
-	urls map[string]string
+	mu           sync.RWMutex
+	urls         map[string]string
+	backwardUrls map[string]string
 }
 
 func NewMemoryURLStorage(urls map[string]string) *MemoryURLStorage {
-	return &MemoryURLStorage{urls: urls}
+	backwardUrls := arrangeMap(urls)
+	return &MemoryURLStorage{urls: urls, backwardUrls: backwardUrls}
 }
 
-func (s *MemoryURLStorage) SaveShortURL(_ context.Context, shortURL string, fullURL string) error {
+func (s *MemoryURLStorage) SaveShortURL(_ context.Context, shortURL, fullURL string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	_, ok := s.urls[shortURL]
 	if ok {
 		return ErrShortURLExists
 	}
+
+	_, ok = s.backwardUrls[fullURL]
+	if ok {
+		return ErrFullURLExists
+	}
+
 	s.urls[shortURL] = fullURL
 	return nil
 }
@@ -67,4 +76,24 @@ func (s *MemoryURLStorage) SaveShortUrlBatch(ctx context.Context, URLRecords []*
 	}
 	s.urls = urls
 	return nil
+}
+
+func arrangeMap(oldMap map[string]string) map[string]string {
+	newMap := make(map[string]string)
+	for k, v := range oldMap {
+		newMap[v] = k
+	}
+	return newMap
+}
+
+func (s *MemoryURLStorage) FindShortURL(_ context.Context, fullURL string) (string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	shortURL, ok := s.backwardUrls[fullURL]
+	if !ok {
+		return "", ErrURLNotFound
+	}
+
+	return shortURL, nil
 }
