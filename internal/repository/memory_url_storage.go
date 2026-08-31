@@ -26,22 +26,22 @@ func NewMemoryURLStorage(urls map[string]string) *MemoryURLStorage {
 	return &MemoryURLStorage{urls: urls, backwardUrls: backwardUrls}
 }
 
-func (s *MemoryURLStorage) SaveShortURL(_ context.Context, shortURL, fullURL string) error {
+func (s *MemoryURLStorage) SaveShortURL(_ context.Context, shortURL, fullURL string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	_, ok := s.urls[shortURL]
 	if ok {
-		return ErrShortURLExists
+		return "", ErrShortURLExists
 	}
 
-	_, ok = s.backwardUrls[fullURL]
+	storedShortURL, ok := s.backwardUrls[fullURL]
 	if ok {
-		return ErrFullURLExists
+		return storedShortURL, ErrFullURLExists
 	}
 
 	s.urls[shortURL] = fullURL
 	s.backwardUrls[fullURL] = shortURL
-	return nil
+	return "", nil
 }
 
 func (s *MemoryURLStorage) FindFullURL(_ context.Context, shortURL string) (string, error) {
@@ -63,7 +63,7 @@ func (s *MemoryURLStorage) Snapshot() map[string]string {
 	return maps.Clone(s.urls)
 }
 
-func (s *MemoryURLStorage) SaveShortUrlBatch(ctx context.Context, URLRecords []*model.URLRecord) error {
+func (s *MemoryURLStorage) SaveShortUrlBatch(_ context.Context, URLRecords []*model.URLRecord) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -93,16 +93,4 @@ func arrangeMap(oldMap map[string]string) map[string]string {
 		newMap[v] = k
 	}
 	return newMap
-}
-
-func (s *MemoryURLStorage) FindShortURL(_ context.Context, fullURL string) (string, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	shortURL, ok := s.backwardUrls[fullURL]
-	if !ok {
-		return "", ErrURLNotFound
-	}
-
-	return shortURL, nil
 }

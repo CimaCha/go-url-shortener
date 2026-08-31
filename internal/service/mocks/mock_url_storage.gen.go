@@ -56,27 +56,13 @@ func (mr *MockURLStorageMockRecorder) FindFullURL(ctx, shortURL any) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindFullURL", reflect.TypeOf((*MockURLStorage)(nil).FindFullURL), ctx, shortURL)
 }
 
-// FindShortURL mocks base method.
-func (m *MockURLStorage) FindShortURL(ctx context.Context, fullURL string) (string, error) {
+// SaveShortURL mocks base method.
+func (m *MockURLStorage) SaveShortURL(ctx context.Context, shortURL, fullURL string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindShortURL", ctx, fullURL)
+	ret := m.ctrl.Call(m, "SaveShortURL", ctx, shortURL, fullURL)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
-}
-
-// FindShortURL indicates an expected call of FindShortURL.
-func (mr *MockURLStorageMockRecorder) FindShortURL(ctx, fullURL any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindShortURL", reflect.TypeOf((*MockURLStorage)(nil).FindShortURL), ctx, fullURL)
-}
-
-// SaveShortURL mocks base method.
-func (m *MockURLStorage) SaveShortURL(ctx context.Context, shortURL, fullURL string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SaveShortURL", ctx, shortURL, fullURL)
-	ret0, _ := ret[0].(error)
-	return ret0
 }
 
 // SaveShortURL indicates an expected call of SaveShortURL.

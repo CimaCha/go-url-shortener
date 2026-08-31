@@ -37,16 +37,12 @@ func (s Service) Shorten(ctx context.Context, fullURL string) (string, error) {
 	}
 	for range maxShortURLAttempts {
 		shortURL := rand.Text()
-		err := s.storage.SaveShortURL(ctx, shortURL, fullURL)
+		storedShortURL, err := s.storage.SaveShortURL(ctx, shortURL, fullURL)
 		if err == nil {
 			return shortURL, nil
 		}
 		if errors.Is(err, repository.ErrFullURLExists) {
-			findShortURL, err := s.storage.FindShortURL(ctx, fullURL)
-			if err != nil {
-				return "", err
-			}
-			return findShortURL, ErrFullURLExists
+			return storedShortURL, ErrFullURLExists
 		}
 		if !errors.Is(err, repository.ErrShortURLExists) {
 			return "", fmt.Errorf("%w: save short URL: %w", ErrRepository, err)

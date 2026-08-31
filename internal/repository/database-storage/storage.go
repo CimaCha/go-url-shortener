@@ -42,14 +42,18 @@ func NewDatabaseStorage(ctx context.Context, databaseURL string) (*Storage, erro
 	return &Storage{Pool: pool}, nil
 }
 
-func (s Storage) SaveShortURL(ctx context.Context, shortURL, fullURL string) error {
-	_, err := s.Pool.Exec(ctx, "INSERT INTO urls(short_url, full_url) VALUES($1,$2)", shortURL, fullURL)
+func (s Storage) SaveShortURL(ctx context.Context, shortURL, fullURL string) (string, error) {
+	var storedFullURL string
+	err := s.Pool.QueryRow(ctx, "INSERT INTO urls(short_url, full_url) VALUES ($1,$2) ON CONFLICT (full_url) DO UPDATE SET full_url=urls.full_url RETURNING urls.short_url;", shortURL, fullURL).Scan(&storedFullURL)
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-		return repository.ErrFullURLExists
+		return "", repository.ErrShortURLExists
+	}
+	if storedFullURL != shortURL {
+		return storedFullURL, repository.ErrFullURLExists
 	}
 
-	return err
+	return "", err
 }
 
 func (s Storage) FindFullURL(ctx context.Context, shortURL string) (string, error) {
@@ -96,23 +100,14 @@ func (s Storage) SaveShortUrlBatch(ctx context.Context, URLRecords []*model.URLR
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return repository.ErrShortURLExists
+			if pgErr.ConstraintName == "urls_pkey" {
+				return repository.ErrShortURLExists
+			}
+			return repository.ErrFullURLExists
 		}
 		return err
 	}
 
 	// завершаем транзакцию
 	return tx.Commit(ctx)
-}
-
-func (s Storage) FindShortURL(ctx context.Context, fullURL string) (string, error) {
-	var shortURL string
-	err := s.Pool.QueryRow(ctx, "SELECT short_url FROM urls WHERE full_url = $1", fullURL).Scan(&shortURL)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return "", repository.ErrURLNotFound
-	}
-	if err != nil {
-		return "", err
-	}
-	return shortURL, nil
 }

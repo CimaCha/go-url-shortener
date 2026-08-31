@@ -86,6 +86,7 @@ func TestStorageSetShortURL(t *testing.T) {
 	tests := []struct {
 		name       string
 		writes     [][2]string
+		wantStored string
 		wantSetErr error
 		wantURLs   map[string]string
 	}{
@@ -111,6 +112,18 @@ func TestStorageSetShortURL(t *testing.T) {
 				"short": "https://first.example",
 			},
 		},
+		{
+			name: "returns existing short URL for duplicate full URL",
+			writes: [][2]string{
+				{"first", "https://example.com"},
+				{"second", "https://example.com"},
+			},
+			wantStored: "first",
+			wantSetErr: repository.ErrFullURLExists,
+			wantURLs: map[string]string{
+				"first": "https://example.com",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -121,12 +134,14 @@ func TestStorageSetShortURL(t *testing.T) {
 			storage, err := NewFileStorage(filename)
 			require.NoError(t, err)
 
+			var storedShortURL string
 			var setErr error
 			for _, write := range tt.writes {
-				setErr = storage.SaveShortURL(ctx, write[0], write[1])
+				storedShortURL, setErr = storage.SaveShortURL(ctx, write[0], write[1])
 			}
 
 			assert.ErrorIs(t, setErr, tt.wantSetErr)
+			assert.Equal(t, tt.wantStored, storedShortURL)
 			snapshots := readSnapshots(t, filename)
 			require.Len(t, snapshots, 1)
 			gotURLs := make(map[string]string, len(snapshots[0]))
@@ -156,7 +171,7 @@ func TestStorageSetShortURLWriteFailure(t *testing.T) {
 			require.NoError(t, err)
 			storage.writer = NewWriter(filepath.Join(root, "missing", "storage.json"))
 
-			err = storage.SaveShortURL(ctx, "short", "https://example.com")
+			_, err = storage.SaveShortURL(ctx, "short", "https://example.com")
 
 			assert.ErrorIs(t, err, ErrOpenFileForWrite)
 			got, getErr := storage.FindFullURL(ctx, "short")

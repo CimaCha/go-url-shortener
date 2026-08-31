@@ -42,12 +42,12 @@ func NewFileStorage(filePath string) (*Storage, error) {
 	}, nil
 }
 
-func (f *Storage) SaveShortURL(ctx context.Context, shortURL, fullURL string) error {
+func (f *Storage) SaveShortURL(ctx context.Context, shortURL, fullURL string) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	if err := f.memory.SaveShortURL(ctx, shortURL, fullURL); err != nil {
-		return err
+	if storedShortURL, err := f.memory.SaveShortURL(ctx, shortURL, fullURL); err != nil {
+		return storedShortURL, err
 	}
 
 	urls := f.memory.Snapshot()
@@ -63,9 +63,9 @@ func (f *Storage) SaveShortURL(ctx context.Context, shortURL, fullURL string) er
 	}
 
 	if err := f.writer.WriteRecords(records); err != nil {
-		return fmt.Errorf("persist short URL: %w", err)
+		return "", fmt.Errorf("persist short URL: %w", err)
 	}
-	return nil
+	return "", nil
 }
 
 func (f *Storage) FindFullURL(ctx context.Context, shortURL string) (string, error) {
@@ -96,8 +96,4 @@ func (f *Storage) SaveShortUrlBatch(ctx context.Context, URLRecords []*model.URL
 		return fmt.Errorf("persist short URL: %w", err)
 	}
 	return nil
-}
-
-func (f *Storage) FindShortURL(ctx context.Context, fullURL string) (string, error) {
-	return f.memory.FindShortURL(ctx, fullURL)
 }

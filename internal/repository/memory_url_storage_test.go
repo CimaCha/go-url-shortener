@@ -14,6 +14,7 @@ func TestMemoryURLStorage(t *testing.T) {
 		writes     [][2]string
 		shortURL   string
 		want       string
+		wantStored string
 		wantSetErr error
 		wantGetErr error
 	}{
@@ -38,18 +39,31 @@ func TestMemoryURLStorage(t *testing.T) {
 			want:       "https://first.example.com",
 			wantSetErr: ErrShortURLExists,
 		},
+		{
+			name: "returns existing short URL for duplicate full URL",
+			writes: [][2]string{
+				{"first", "https://example.com"},
+				{"second", "https://example.com"},
+			},
+			shortURL:   "first",
+			want:       "https://example.com",
+			wantStored: "first",
+			wantSetErr: ErrFullURLExists,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			storage := NewMemoryURLStorage(make(map[string]string))
+			var storedShortURL string
 			var setErr error
 			for _, write := range tt.writes {
-				setErr = storage.SaveShortURL(ctx, write[0], write[1])
+				storedShortURL, setErr = storage.SaveShortURL(ctx, write[0], write[1])
 			}
 
 			assert.ErrorIs(t, setErr, tt.wantSetErr)
+			assert.Equal(t, tt.wantStored, storedShortURL)
 
 			got, err := storage.FindFullURL(ctx, tt.shortURL)
 			assert.ErrorIs(t, err, tt.wantGetErr)
@@ -69,7 +83,8 @@ func TestMemoryURLStorageSnapshot(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			storage := NewMemoryURLStorage(make(map[string]string))
-			assert.NoError(t, storage.SaveShortURL(ctx, "short", "https://example.com"))
+			_, err := storage.SaveShortURL(ctx, "short", "https://example.com")
+			assert.NoError(t, err)
 
 			snapshot := storage.Snapshot()
 			snapshot["short"] = "changed"

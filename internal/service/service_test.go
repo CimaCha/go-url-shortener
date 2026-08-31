@@ -29,11 +29,22 @@ func TestServiceShorten(t *testing.T) {
 			setup: func(storage *mocks.MockURLStorage, ctx context.Context, storedShortURL *string) {
 				storage.EXPECT().
 					SaveShortURL(ctx, gomock.Any(), "https://example.com/path").
-					DoAndReturn(func(_ context.Context, shortURL string, _ string) error {
+					DoAndReturn(func(_ context.Context, shortURL string, _ string) (string, error) {
 						*storedShortURL = shortURL
-						return nil
+						return "", nil
 					})
 			},
+		},
+		{
+			name:    "returns stored short URL for duplicate full URL",
+			fullURL: "https://example.com/path",
+			setup: func(storage *mocks.MockURLStorage, ctx context.Context, storedShortURL *string) {
+				*storedShortURL = "stored"
+				storage.EXPECT().
+					SaveShortURL(ctx, gomock.Any(), "https://example.com/path").
+					Return("stored", repository.ErrFullURLExists)
+			},
+			wantErr: ErrFullURLExists,
 		},
 		{
 			name:    "retries after collision",
@@ -41,12 +52,12 @@ func TestServiceShorten(t *testing.T) {
 			setup: func(storage *mocks.MockURLStorage, ctx context.Context, storedShortURL *string) {
 				first := storage.EXPECT().
 					SaveShortURL(ctx, gomock.Any(), "https://example.com/path").
-					Return(repository.ErrShortURLExists)
+					Return("", repository.ErrShortURLExists)
 				second := storage.EXPECT().
 					SaveShortURL(ctx, gomock.Any(), "https://example.com/path").
-					DoAndReturn(func(_ context.Context, shortURL string, _ string) error {
+					DoAndReturn(func(_ context.Context, shortURL string, _ string) (string, error) {
 						*storedShortURL = shortURL
-						return nil
+						return "", nil
 					})
 				gomock.InOrder(first, second)
 			},
@@ -57,7 +68,7 @@ func TestServiceShorten(t *testing.T) {
 			setup: func(storage *mocks.MockURLStorage, ctx context.Context, _ *string) {
 				storage.EXPECT().
 					SaveShortURL(ctx, gomock.Any(), "https://example.com/path").
-					Return(repository.ErrShortURLExists).
+					Return("", repository.ErrShortURLExists).
 					Times(maxShortURLAttempts)
 			},
 			wantErr: ErrUniqueShortURL,
@@ -68,7 +79,7 @@ func TestServiceShorten(t *testing.T) {
 			setup: func(storage *mocks.MockURLStorage, ctx context.Context, _ *string) {
 				storage.EXPECT().
 					SaveShortURL(ctx, gomock.Any(), "https://example.com/path").
-					Return(errStorage)
+					Return("", errStorage)
 			},
 			wantErr:   ErrRepository,
 			wantCause: errStorage,
@@ -88,6 +99,9 @@ func TestServiceShorten(t *testing.T) {
 			got, err := NewService(storage).Shorten(ctx, tt.fullURL)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
+				if errors.Is(tt.wantErr, ErrFullURLExists) {
+					assert.Equal(t, storedShortURL, got)
+				}
 			} else {
 				assert.NoError(t, err)
 				assert.NotEmpty(t, got)
