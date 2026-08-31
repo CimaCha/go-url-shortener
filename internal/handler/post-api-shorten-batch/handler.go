@@ -58,12 +58,13 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 	finalURL := convertShortURLToFinalURL(h.defaultShortAddress, shortURLs)
 	encodedBody := model.ShortenBatchResponse(finalURL)
-	res.Header().Set("Content-Type", "application/json")
-	res.WriteHeader(http.StatusCreated)
 	responseBody, err := json.Marshal(encodedBody)
 	if err != nil {
+		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(http.StatusCreated)
 	_, _ = res.Write(responseBody)
 }
 

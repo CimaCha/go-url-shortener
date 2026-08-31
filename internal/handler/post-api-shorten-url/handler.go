@@ -66,13 +66,13 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 func (h Handler) createResponse(res http.ResponseWriter, url string, status int) http.ResponseWriter {
 	var encodedBody model.ShortenURLResponse
 	encodedBody.Result = fmt.Sprintf("%s/%s", h.defaultShortAddress, url)
-	res.Header().Set("Content-Type", "application/json")
-	res.WriteHeader(status)
 	responseBody, err := json.Marshal(encodedBody)
 	if err != nil {
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return res
 	}
+	res.Header().Set("Content-Type", "application/json")
+	res.WriteHeader(status)
 	_, _ = res.Write(responseBody)
 	return res
 }

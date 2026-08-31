@@ -43,21 +43,10 @@ func NewDatabaseStorage(ctx context.Context, databaseURL string) (*Storage, erro
 }
 
 func (s Storage) SaveShortURL(ctx context.Context, shortURL, fullURL string) error {
-	var storedShortURL string
-	row := s.Pool.QueryRow(ctx, "SELECT short_url FROM urls WHERE full_url = $1", fullURL)
-	err := row.Scan(&storedShortURL)
-	if err != nil {
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return err
-		}
-	}
-	if storedShortURL != "" {
-		return repository.ErrFullURLExists
-	}
-	_, err = s.Pool.Exec(ctx, "INSERT INTO urls(short_url, full_url) VALUES($1,$2)", shortURL, fullURL)
+	_, err := s.Pool.Exec(ctx, "INSERT INTO urls(short_url, full_url) VALUES($1,$2)", shortURL, fullURL)
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-		return repository.ErrShortURLExists
+		return repository.ErrFullURLExists
 	}
 
 	return err
@@ -92,16 +81,26 @@ func (s Storage) SaveShortUrlBatch(ctx context.Context, URLRecords []*model.URLR
 
 	defer tx.Rollback(ctx)
 
-	for _, URLRecord := range URLRecords {
-		_, err = tx.Exec(ctx, "INSERT INTO urls(short_url, full_url) VALUES($1,$2)", URLRecord.ShortURL, URLRecord.OriginalURL)
-		if err != nil {
-			var pgErr *pgconn.PgError
-			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-				return repository.ErrShortURLExists
-			}
-			return err
-		}
+	var rows [][]interface{}
+	for _, urls := range URLRecords {
+		rows = append(rows, []interface{}{urls.ShortURL, urls.OriginalURL})
 	}
+
+	_, err = tx.CopyFrom(
+		ctx,
+		pgx.Identifier{"urls"},
+		[]string{"short_url", "full_url"},
+		pgx.CopyFromRows(rows),
+	)
+
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return repository.ErrShortURLExists
+		}
+		return err
+	}
+
 	// завершаем транзакцию
 	return tx.Commit(ctx)
 }

@@ -40,6 +40,7 @@ func (s *MemoryURLStorage) SaveShortURL(_ context.Context, shortURL, fullURL str
 	}
 
 	s.urls[shortURL] = fullURL
+	s.backwardUrls[fullURL] = shortURL
 	return nil
 }
 
@@ -67,14 +68,22 @@ func (s *MemoryURLStorage) SaveShortUrlBatch(ctx context.Context, URLRecords []*
 	defer s.mu.Unlock()
 
 	urls := maps.Clone(s.urls)
+	backwardURLs := maps.Clone(s.backwardUrls)
 	for _, record := range URLRecords {
 		_, ok := urls[record.ShortURL]
 		if ok {
 			return ErrShortURLExists
 		}
 		urls[record.ShortURL] = record.OriginalURL
+
+		_, ok = backwardURLs[record.OriginalURL]
+		if ok {
+			return ErrFullURLExists
+		}
+		backwardURLs[record.OriginalURL] = record.ShortURL
 	}
 	s.urls = urls
+	s.backwardUrls = backwardURLs
 	return nil
 }
 
