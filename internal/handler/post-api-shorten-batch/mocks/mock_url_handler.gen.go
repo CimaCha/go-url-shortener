@@ -13,6 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	model "github.com/CimaCha/go-url-shortener/internal/model"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -40,17 +41,17 @@ func (m *MockShortener) EXPECT() *MockShortenerMockRecorder {
 	return m.recorder
 }
 
-// Shorten mocks base method.
-func (m *MockShortener) Shorten(ctx context.Context, fullURL string) (string, error) {
+// ShortenBatch mocks base method.
+func (m *MockShortener) ShortenBatch(ctx context.Context, fullURLBatch []*model.OriginalURLRecord) ([]*model.ShortURLRecord, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Shorten", ctx, fullURL)
-	ret0, _ := ret[0].(string)
+	ret := m.ctrl.Call(m, "ShortenBatch", ctx, fullURLBatch)
+	ret0, _ := ret[0].([]*model.ShortURLRecord)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// Shorten indicates an expected call of Shorten.
-func (mr *MockShortenerMockRecorder) Shorten(ctx, fullURL any) *gomock.Call {
+// ShortenBatch indicates an expected call of ShortenBatch.
+func (mr *MockShortenerMockRecorder) ShortenBatch(ctx, fullURLBatch any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Shorten", reflect.TypeOf((*MockShortener)(nil).Shorten), ctx, fullURL)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShortenBatch", reflect.TypeOf((*MockShortener)(nil).ShortenBatch), ctx, fullURLBatch)
 }

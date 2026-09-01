@@ -1,7 +1,9 @@
 package fullurl
 
 import (
+	"context"
 	"errors"
+	"go.uber.org/zap"
 	"net/http"
 
 	"github.com/CimaCha/go-url-shortener/internal/service"
@@ -10,23 +12,26 @@ import (
 
 //go:generate mockgen -source=handler.go -destination=mocks/mock_url_handler.gen.go -package=mocks
 
-type URLService interface {
-	GetFullURL(shortURL string) (string, error)
+type Resolver interface {
+	Resolve(ctx context.Context, shortURL string) (string, error)
 }
 
 type Handler struct {
-	service URLService
+	log     zap.Logger
+	service Resolver
 }
 
-func NewGetFullURLHandler(service URLService) Handler {
-	return Handler{service: service}
+func NewGetFullURLHandler(log zap.Logger, service Resolver) Handler {
+	return Handler{
+		log:     log,
+		service: service}
 }
 
 func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 	id := chi.URLParam(req, "id")
 
-	fullURL, err := h.service.GetFullURL(id)
+	fullURL, err := h.service.Resolve(req.Context(), id)
 	if err != nil {
 		if errors.Is(err, service.ErrURLNotFound) {
 			http.Error(res, err.Error(), http.StatusNotFound)
@@ -36,6 +41,7 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 			http.Error(res, err.Error(), http.StatusBadRequest)
 			return
 		}
+		h.log.Error("can't resolve URL", zap.Error(err))
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}

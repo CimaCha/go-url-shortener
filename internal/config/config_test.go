@@ -20,13 +20,15 @@ func TestNew(t *testing.T) {
 		envAddress   string
 		envBaseURL   string
 		envFilePath  string
+		envDatabase  string
 		wantAddress  string
 		wantBaseURL  string
 		wantFilePath string
+		wantDatabase string
 	}{
-		{name: "defaults", wantAddress: "localhost:8080", wantBaseURL: "http://localhost:8080", wantFilePath: "./storage.json"},
-		{name: "flags", args: []string{"-a", "cli:8080", "-b", "http://cli:8080", "-f", "/tmp/cli-storage.json"}, wantAddress: "cli:8080", wantBaseURL: "http://cli:8080", wantFilePath: "/tmp/cli-storage.json"},
-		{name: "environment overrides flags", args: []string{"-a", "cli:8080", "-b", "http://cli:8080", "-f", "/tmp/cli-storage.json"}, envAddress: "env:9090", envBaseURL: "http://env:9090", envFilePath: "/tmp/env-storage.json", wantAddress: "env:9090", wantBaseURL: "http://env:9090", wantFilePath: "/tmp/env-storage.json"},
+		{name: "defaults", wantAddress: "localhost:8080", wantBaseURL: "http://localhost:8080"},
+		{name: "flags", args: []string{"-a", "cli:8080", "-b", "http://cli:8080", "-f", "/tmp/cli-storage.json", "-d", "postgres://cli"}, wantAddress: "cli:8080", wantBaseURL: "http://cli:8080", wantFilePath: "/tmp/cli-storage.json", wantDatabase: "postgres://cli"},
+		{name: "environment overrides flags", args: []string{"-a", "cli:8080", "-b", "http://cli:8080", "-f", "/tmp/cli-storage.json", "-d", "postgres://cli"}, envAddress: "env:9090", envBaseURL: "http://env:9090", envFilePath: "/tmp/env-storage.json", envDatabase: "postgres://env", wantAddress: "env:9090", wantBaseURL: "http://env:9090", wantFilePath: "/tmp/env-storage.json", wantDatabase: "postgres://env"},
 	}
 
 	for _, tt := range tests {
@@ -37,6 +39,7 @@ func TestNew(t *testing.T) {
 			t.Setenv("SERVER_ADDRESS", tt.envAddress)
 			t.Setenv("BASE_URL", tt.envBaseURL)
 			t.Setenv("FILE_STORAGE_PATH", tt.envFilePath)
+			t.Setenv("DATABASE_DSN", tt.envDatabase)
 
 			cfg, err := New()
 			if err != nil {
@@ -50,6 +53,9 @@ func TestNew(t *testing.T) {
 			}
 			if cfg.FilePath != tt.wantFilePath {
 				t.Errorf("FilePath = %q, want %q", cfg.FilePath, tt.wantFilePath)
+			}
+			if cfg.DatabaseURL != tt.wantDatabase {
+				t.Errorf("DatabaseURL = %q, want %q", cfg.DatabaseURL, tt.wantDatabase)
 			}
 		})
 	}

@@ -29,7 +29,10 @@ func TestRouter(t *testing.T) {
 		{name: "unsupported content type", method: http.MethodPost, path: "/", contentType: "application/json", wantStatus: http.StatusUnsupportedMediaType},
 		{name: "shorten URL through API", method: http.MethodPost, path: "/api/shorten", contentType: "application/json", wantStatus: http.StatusCreated, wantHandler: "api-shorten"},
 		{name: "unsupported API content type", method: http.MethodPost, path: "/api/shorten", contentType: "text/plain", wantStatus: http.StatusUnsupportedMediaType},
+		{name: "shorten URL batch through API", method: http.MethodPost, path: "/api/shorten/batch", contentType: "application/json", wantStatus: http.StatusCreated, wantHandler: "api-shorten-batch"},
+		{name: "unsupported batch API content type", method: http.MethodPost, path: "/api/shorten/batch", contentType: "text/plain", wantStatus: http.StatusUnsupportedMediaType},
 		{name: "get full URL", method: http.MethodGet, path: "/short", wantStatus: http.StatusTemporaryRedirect, wantHandler: "full", wantID: "short"},
+		{name: "ping database", method: http.MethodGet, path: "/ping", wantStatus: http.StatusOK, wantHandler: "ping"},
 		{name: "method not allowed", method: http.MethodPut, path: "/", wantStatus: http.StatusMethodNotAllowed},
 	}
 
@@ -45,12 +48,20 @@ func TestRouter(t *testing.T) {
 				gotHandler = "api-shorten"
 				res.WriteHeader(http.StatusCreated)
 			})
+			apiShortenBatchHandler := http.HandlerFunc(func(res http.ResponseWriter, _ *http.Request) {
+				gotHandler = "api-shorten-batch"
+				res.WriteHeader(http.StatusCreated)
+			})
 			getFullURLHandler := http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 				gotHandler = "full"
 				gotID = chi.URLParam(req, "id")
 				res.WriteHeader(http.StatusTemporaryRedirect)
 			})
-			router := New(zap.NewNop(), shortenURLHandler, apiShortenURLHandler, getFullURLHandler)
+			pingHandler := http.HandlerFunc(func(res http.ResponseWriter, _ *http.Request) {
+				gotHandler = "ping"
+				res.WriteHeader(http.StatusOK)
+			})
+			router := New(zap.NewNop(), shortenURLHandler, apiShortenURLHandler, getFullURLHandler, pingHandler, apiShortenBatchHandler)
 			request := httptest.NewRequest(tt.method, tt.path, strings.NewReader("https://example.com"))
 			request.Header.Set("Content-Type", tt.contentType)
 			response := httptest.NewRecorder()
@@ -202,7 +213,7 @@ func TestRouterGzipMiddleware(t *testing.T) {
 				gotHandler = "full"
 				writer.WriteHeader(http.StatusTemporaryRedirect)
 			})
-			router := New(zap.NewNop(), shortenURLHandler, apiShortenURLHandler, getFullURLHandler)
+			router := New(zap.NewNop(), shortenURLHandler, apiShortenURLHandler, getFullURLHandler, http.NotFoundHandler(), http.NotFoundHandler())
 			request := httptest.NewRequest(http.MethodPost, tt.path, bytes.NewReader(tt.body(t)))
 			request.Header.Set("Content-Type", tt.contentType)
 			if tt.acceptEncoding != "" {

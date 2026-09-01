@@ -1,67 +1,93 @@
 package main
 
 import (
-	"fmt"
+	"context"
+	"errors"
+	apishortenbatch "github.com/CimaCha/go-url-shortener/internal/handler/post-api-shorten-batch"
+	"github.com/CimaCha/go-url-shortener/internal/repository"
+	database_storage "github.com/CimaCha/go-url-shortener/internal/repository/database-storage"
+	"github.com/CimaCha/go-url-shortener/internal/repository/file"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/CimaCha/go-url-shortener/internal/config"
 	"github.com/CimaCha/go-url-shortener/internal/handler/get-full-url"
+	getping "github.com/CimaCha/go-url-shortener/internal/handler/get-ping"
 	apishortenurl "github.com/CimaCha/go-url-shortener/internal/handler/post-api-shorten-url"
 	"github.com/CimaCha/go-url-shortener/internal/handler/post-shorten-url"
 	"github.com/CimaCha/go-url-shortener/internal/logger"
-	"github.com/CimaCha/go-url-shortener/internal/repository/file"
 	shortenerrouter "github.com/CimaCha/go-url-shortener/internal/router"
 	"github.com/CimaCha/go-url-shortener/internal/service"
 	"go.uber.org/zap"
 )
 
-var (
-	initializedLogger *zap.Logger
-	err               error
-)
-
 func main() {
-	initializedLogger, err = logger.Initialize("debug")
+	initializedLogger, err := logger.Initialize("debug")
 	if err != nil {
 		log.Fatal("logger initialization error", err.Error())
 	}
-	if err = run(); err != nil {
-		initializedLogger.Error("application stopped", zap.Error(err))
-		_ = initializedLogger.Sync()
-		os.Exit(1)
+	defer initializedLogger.Sync()
+
+	if err = run(*initializedLogger); err != nil {
+		initializedLogger.Fatal("application stopped", zap.Error(err))
 	}
-	_ = initializedLogger.Sync()
 }
 
-func run() error {
+func run(log zap.Logger) error {
+	ctx := context.Background()
 	cfg, err := config.New()
 	if err != nil {
-		initializedLogger.Error("cannot parse config")
-		return fmt.Errorf("parse config: %w", err)
+		log.Error("cannot parse config")
+		return err
 	}
 
-	fileStorage, err := file.NewFileStorage(cfg.FilePath)
-	if err != nil {
-		initializedLogger.Error("new file storage error", zap.Error(err))
-		return fmt.Errorf("open file storage: %w", err)
-	}
-	shortenURLService := service.NewService(fileStorage)
+	var storage service.URLStorage
+	var pingHandler http.Handler = getping.NewDBConnectionPingHandler(log,
+		getping.PingFunc(func(context.Context) error {
+			return errors.New("database is not configured")
+		}),
+	)
 
-	shortenURLHandler := shortenurl.NewShortenURLHandler(shortenURLService, cfg.BasicShortenAddress)
-	apiShortenURLHandler := apishortenurl.NewAPIShortenURLHandler(shortenURLService, cfg.BasicShortenAddress)
-	getFullURLHandler := fullurl.NewGetFullURLHandler(shortenURLService)
+	switch {
+	case cfg.DatabaseURL != "":
+		dbStorage, err := database_storage.NewDatabaseStorage(ctx, cfg.DatabaseURL)
+		if err != nil {
+			return err
+		}
+		defer dbStorage.Close()
+
+		storage = dbStorage
+		pingHandler = getping.NewDBConnectionPingHandler(*log.With(zap.String("handler", "ping to db")), dbStorage)
+
+	case cfg.FilePath != "":
+		fileStorage, err := file.NewFileStorage(cfg.FilePath)
+		if err != nil {
+			return err
+		}
+		storage = fileStorage
+
+	default:
+		storage = repository.NewMemoryURLStorage(make(map[string]string))
+	}
+
+	urlService := service.NewService(storage)
+
+	shortenURLHandler := shortenurl.NewShortenURLHandler(*log.With(zap.String("handler", "shorten URL")), urlService, cfg.BasicShortenAddress)
+	apiShortenURLHandler := apishortenurl.NewAPIShortenURLHandler(*log.With(zap.String("handler", "api shorten URL")), urlService, cfg.BasicShortenAddress)
+	getFullURLHandler := fullurl.NewGetFullURLHandler(*log.With(zap.String("handler", "get full URL")), urlService)
+	apiShortenBatchHandler := apishortenbatch.NewAPIShortenBatchHandler(*log.With(zap.String("handler", "api shorten batch")), urlService, cfg.BasicShortenAddress)
 
 	router := shortenerrouter.New(
-		initializedLogger.With(zap.String("layer", "router")),
+		log.With(zap.String("layer", "router")),
 		shortenURLHandler,
 		apiShortenURLHandler,
-		getFullURLHandler)
+		getFullURLHandler,
+		pingHandler,
+		apiShortenBatchHandler)
 
 	err = http.ListenAndServe(cfg.Address, router)
 	if err != nil {
-		initializedLogger.Error("HTTP server stopped", zap.Error(err))
+		log.Error("HTTP server stopped", zap.Error(err))
 		return err
 	}
 	return nil

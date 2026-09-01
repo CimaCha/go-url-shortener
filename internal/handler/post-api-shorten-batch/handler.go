@@ -1,4 +1,4 @@
-package apishortenurl
+package apishortenbatch
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 //go:generate mockgen -source=handler.go -destination=mocks/mock_url_handler.gen.go -package=mocks
 
 type Shortener interface {
-	Shorten(ctx context.Context, fullURL string) (string, error)
+	ShortenBatch(ctx context.Context, fullURLBatch []*model.OriginalURLRecord) ([]*model.ShortURLRecord, error)
 }
 
 type Handler struct {
@@ -24,7 +24,7 @@ type Handler struct {
 	defaultShortAddress string
 }
 
-func NewAPIShortenURLHandler(log zap.Logger, service Shortener, defaultShortAddress string) Handler {
+func NewAPIShortenBatchHandler(log zap.Logger, service Shortener, defaultShortAddress string) Handler {
 	return Handler{
 		log:                 log,
 		service:             service,
@@ -33,7 +33,7 @@ func NewAPIShortenURLHandler(log zap.Logger, service Shortener, defaultShortAddr
 }
 
 func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
-	var decodedBody model.ShortenURLRequest
+	var decodedBody model.ShortenBatchRequest
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
 		h.log.Error("can't read request body", zap.Error(err))
@@ -45,13 +45,9 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, err.Error(), http.StatusBadRequest)
 		return
 	}
-	url, err := h.service.Shorten(req.Context(), decodedBody.URL)
+	shortURLs, err := h.service.ShortenBatch(req.Context(), decodedBody)
 	if err != nil {
-		if errors.Is(err, service.ErrFullURLExists) {
-			res = h.createResponse(res, url, http.StatusConflict)
-			return
-		}
-		if errors.Is(err, service.ErrEmptyURL) {
+		if errors.Is(err, service.ErrEmptyURLList) {
 			http.Error(res, err.Error(), http.StatusBadRequest)
 		} else {
 			h.log.Error("can't shorten URL", zap.Error(err))
@@ -60,19 +56,21 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	res = h.createResponse(res, url, http.StatusCreated)
-}
-
-func (h Handler) createResponse(res http.ResponseWriter, url string, status int) http.ResponseWriter {
-	var encodedBody model.ShortenURLResponse
-	encodedBody.Result = fmt.Sprintf("%s/%s", h.defaultShortAddress, url)
+	finalURL := convertShortURLToFinalURL(h.defaultShortAddress, shortURLs)
+	encodedBody := model.ShortenBatchResponse(finalURL)
 	responseBody, err := json.Marshal(encodedBody)
 	if err != nil {
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return res
+		return
 	}
 	res.Header().Set("Content-Type", "application/json")
-	res.WriteHeader(status)
+	res.WriteHeader(http.StatusCreated)
 	_, _ = res.Write(responseBody)
-	return res
+}
+
+func convertShortURLToFinalURL(shortAddress string, shortURLs []*model.ShortURLRecord) []*model.ShortURLRecord {
+	for _, shortURL := range shortURLs {
+		shortURL.ShortURL = fmt.Sprintf("%s/%s", shortAddress, shortURL.ShortURL)
+	}
+	return shortURLs
 }

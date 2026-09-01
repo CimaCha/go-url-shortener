@@ -1,4 +1,4 @@
-package apishortenurl
+package apishortenbatch
 
 import (
 	"context"
@@ -9,20 +9,23 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/CimaCha/go-url-shortener/internal/handler/post-api-shorten-url/mocks"
+	"github.com/CimaCha/go-url-shortener/internal/handler/post-api-shorten-batch/mocks"
+	"github.com/CimaCha/go-url-shortener/internal/model"
 	"github.com/CimaCha/go-url-shortener/internal/service"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
 )
 
-var errHandlerService = errors.New("service error")
+var errBatchHandlerService = errors.New("service error")
 
-type errorReader struct{}
+type batchHandlerErrorReader struct{}
 
-func (errorReader) Read([]byte) (int, error) { return 0, errors.New("read error") }
+func (batchHandlerErrorReader) Read([]byte) (int, error) {
+	return 0, errors.New("read error")
+}
 
-func TestAPIShortenURLHandler(t *testing.T) {
+func TestAPIShortenBatchHandler(t *testing.T) {
 	tests := []struct {
 		name            string
 		body            string
@@ -35,32 +38,44 @@ func TestAPIShortenURLHandler(t *testing.T) {
 	}{
 		{
 			name: "successful request",
-			body: `{"url":"https://example.com/path"}`,
+			body: `[
+				{"correlation_id":"first","original_url":"https://example.com/first"},
+				{"correlation_id":"second","original_url":"https://example.com/second"}
+			]`,
 			setup: func(urlService *mocks.MockShortener, ctx context.Context) {
-				urlService.EXPECT().
-					Shorten(ctx, "https://example.com/path").
-					Return("short", nil)
+				urlService.EXPECT().ShortenBatch(ctx, []*model.OriginalURLRecord{
+					{CorrelationId: "first", OriginalURL: "https://example.com/first"},
+					{CorrelationId: "second", OriginalURL: "https://example.com/second"},
+				}).Return([]*model.ShortURLRecord{
+					{CorrelationId: "first", ShortURL: "short-first"},
+					{CorrelationId: "second", ShortURL: "short-second"},
+				}, nil)
 			},
-			wantStatus:      http.StatusCreated,
-			wantBody:        `{"result":"http://localhost:8080/short"}`,
+			wantStatus: http.StatusCreated,
+			wantBody: `[
+				{"correlation_id":"first","short_url":"http://localhost:8080/short-first"},
+				{"correlation_id":"second","short_url":"http://localhost:8080/short-second"}
+			]`,
 			wantJSON:        true,
 			wantContentType: "application/json",
 		},
 		{
-			name: "empty URL",
-			body: `{}`,
+			name: "empty batch",
+			body: `[]`,
 			setup: func(urlService *mocks.MockShortener, ctx context.Context) {
-				urlService.EXPECT().Shorten(ctx, "").Return("", service.ErrEmptyURL)
+				urlService.EXPECT().ShortenBatch(ctx, []*model.OriginalURLRecord{}).Return(nil, service.ErrEmptyURLList)
 			},
 			wantStatus:      http.StatusBadRequest,
-			wantBody:        "empty URL\n",
+			wantBody:        "empty URL list\n",
 			wantContentType: "text/plain; charset=utf-8",
 		},
 		{
 			name: "service error",
-			body: `{"url":"https://example.com/path"}`,
+			body: `[{"correlation_id":"first","original_url":"https://example.com/first"}]`,
 			setup: func(urlService *mocks.MockShortener, ctx context.Context) {
-				urlService.EXPECT().Shorten(ctx, "https://example.com/path").Return("", errHandlerService)
+				urlService.EXPECT().ShortenBatch(ctx, []*model.OriginalURLRecord{
+					{CorrelationId: "first", OriginalURL: "https://example.com/first"},
+				}).Return(nil, errBatchHandlerService)
 			},
 			wantStatus:      http.StatusInternalServerError,
 			wantBody:        "Internal Server Error\n",
@@ -75,7 +90,7 @@ func TestAPIShortenURLHandler(t *testing.T) {
 		},
 		{
 			name:            "invalid JSON",
-			body:            `{`,
+			body:            `[`,
 			wantStatus:      http.StatusBadRequest,
 			wantBody:        "unexpected end of JSON input\n",
 			wantContentType: "text/plain; charset=utf-8",
@@ -88,13 +103,13 @@ func TestAPIShortenURLHandler(t *testing.T) {
 			urlService := mocks.NewMockShortener(controller)
 			var body io.Reader = strings.NewReader(tt.body)
 			if tt.readError {
-				body = errorReader{}
+				body = batchHandlerErrorReader{}
 			}
-			request := httptest.NewRequest(http.MethodPost, "/api/shorten", body)
+			request := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", body)
 			if tt.setup != nil {
 				tt.setup(urlService, request.Context())
 			}
-			handler := NewAPIShortenURLHandler(*zap.NewNop(), urlService, "http://localhost:8080")
+			handler := NewAPIShortenBatchHandler(*zap.NewNop(), urlService, "http://localhost:8080")
 			response := httptest.NewRecorder()
 
 			handler.ServeHTTP(response, request)
