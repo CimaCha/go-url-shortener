@@ -19,7 +19,7 @@ func AuthMiddleware(log *zap.Logger, jwtBuilder JWTBuilder) func(http.Handler) h
 			if errors.Is(err, http.ErrNoCookie) {
 				log.Info("user need auth")
 				// если нет куки, генерируем id и устанавливаем куку
-				id, err := generateUserId()
+				id, err := generateUserID()
 				if err != nil {
 					http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				}
@@ -55,7 +55,7 @@ func AuthMiddleware(log *zap.Logger, jwtBuilder JWTBuilder) func(http.Handler) h
 	}
 }
 
-func generateUserId() (string, error) {
+func generateUserID() (string, error) {
 	// определяем слайс байт нужной длины
 	b := make([]byte, 16)
 	_, err := rand.Read(b) // записываем байты в слайс b
