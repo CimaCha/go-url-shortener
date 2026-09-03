@@ -15,7 +15,7 @@ import (
 //go:generate mockgen -source=handler.go -destination=mocks/mock_url_handler.gen.go -package=mocks
 
 type Shortener interface {
-	ShortenBatch(ctx context.Context, fullURLBatch []*model.OriginalURLRecord, userId string) ([]*model.ShortURLRecord, error)
+	ShortenBatch(ctx context.Context, fullURLBatch []*model.OriginalURLRecord, userID string) ([]*model.ShortURLRecord, error)
 }
 
 type Handler struct {

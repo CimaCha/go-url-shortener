@@ -9,7 +9,7 @@ import (
 
 var (
 	ErrTokenIsInvalid = errors.New("token is not valid")
-	ErrNoUserIdExists = errors.New("user id is not exists in token claims")
+	ErrNoUserIDExists = errors.New("user id is not exists in token claims")
 )
 
 type JWTBuilder struct {
@@ -30,7 +30,7 @@ type Claims struct {
 }
 
 // BuildJWTString создаёт токен и возвращает его в виде строки.
-func (b JWTBuilder) BuildJWTString(userId string, tokenExp time.Duration) (string, error) {
+func (b JWTBuilder) BuildJWTString(userID string, tokenExp time.Duration) (string, error) {
 	// создаём новый токен с алгоритмом подписи HS256 и утверждениями — Claims
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -38,7 +38,7 @@ func (b JWTBuilder) BuildJWTString(userId string, tokenExp time.Duration) (strin
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(tokenExp)),
 		},
 		// собственное утверждение
-		UserID: userId,
+		UserID: userID,
 	})
 
 	// создаём строку токена
@@ -63,7 +63,7 @@ func (b JWTBuilder) GetUserID(tokenString string) (string, error) {
 	var validationError = jwt.ValidationError{}
 	if errors.As(err, &validationError) {
 		if validationError.Errors == jwt.ValidationErrorClaimsInvalid {
-			return "", ErrNoUserIdExists
+			return "", ErrNoUserIDExists
 		}
 	}
 

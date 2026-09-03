@@ -44,11 +44,11 @@ func TestAPIShortenBatchHandler(t *testing.T) {
 			]`,
 			setup: func(urlService *mocks.MockShortener, ctx context.Context) {
 				urlService.EXPECT().ShortenBatch(ctx, []*model.OriginalURLRecord{
-					{CorrelationId: "first", OriginalURL: "https://example.com/first"},
-					{CorrelationId: "second", OriginalURL: "https://example.com/second"},
+					{CorrelationID: "first", OriginalURL: "https://example.com/first"},
+					{CorrelationID: "second", OriginalURL: "https://example.com/second"},
 				}, "user-id").Return([]*model.ShortURLRecord{
-					{CorrelationId: "first", ShortURL: "short-first"},
-					{CorrelationId: "second", ShortURL: "short-second"},
+					{CorrelationID: "first", ShortURL: "short-first"},
+					{CorrelationID: "second", ShortURL: "short-second"},
 				}, nil)
 			},
 			wantStatus: http.StatusCreated,
@@ -74,7 +74,7 @@ func TestAPIShortenBatchHandler(t *testing.T) {
 			body: `[{"correlation_id":"first","original_url":"https://example.com/first"}]`,
 			setup: func(urlService *mocks.MockShortener, ctx context.Context) {
 				urlService.EXPECT().ShortenBatch(ctx, []*model.OriginalURLRecord{
-					{CorrelationId: "first", OriginalURL: "https://example.com/first"},
+					{CorrelationID: "first", OriginalURL: "https://example.com/first"},
 				}, "user-id").Return(nil, errBatchHandlerService)
 			},
 			wantStatus:      http.StatusInternalServerError,

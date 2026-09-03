@@ -24,7 +24,7 @@ type MemoryURLStorage struct {
 }
 
 type UserPair struct {
-	UserId      string
+	UserID      string
 	OriginalURL string
 }
 
@@ -34,7 +34,7 @@ func NewMemoryURLStorage(urls map[string]UserPair) *MemoryURLStorage {
 	return &MemoryURLStorage{urls: urls, backwardUrls: backwardUrls, userMap: userMap}
 }
 
-func (s *MemoryURLStorage) SaveShortURL(_ context.Context, shortURL, fullURL, userId string) (string, error) {
+func (s *MemoryURLStorage) SaveShortURL(_ context.Context, shortURL, fullURL, userID string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	_, ok := s.urls[shortURL]
@@ -47,13 +47,13 @@ func (s *MemoryURLStorage) SaveShortURL(_ context.Context, shortURL, fullURL, us
 		return storedShortURL, ErrFullURLExists
 	}
 
-	s.urls[shortURL] = UserPair{UserId: userId, OriginalURL: fullURL}
+	s.urls[shortURL] = UserPair{UserID: userID, OriginalURL: fullURL}
 	s.backwardUrls[fullURL] = shortURL
-	userURLList, ok := s.userMap[userId]
+	userURLList, ok := s.userMap[userID]
 	if !ok {
-		s.userMap[userId] = []*model.UserRecord{{ShortURL: shortURL, OriginalURL: fullURL}}
+		s.userMap[userID] = []*model.UserRecord{{ShortURL: shortURL, OriginalURL: fullURL}}
 	} else {
-		s.userMap[userId] = append(userURLList, &model.UserRecord{ShortURL: shortURL, OriginalURL: fullURL})
+		s.userMap[userID] = append(userURLList, &model.UserRecord{ShortURL: shortURL, OriginalURL: fullURL})
 	}
 	return "", nil
 }
@@ -77,7 +77,7 @@ func (s *MemoryURLStorage) Snapshot() map[string]UserPair {
 	return maps.Clone(s.urls)
 }
 
-func (s *MemoryURLStorage) SaveShortUrlBatch(_ context.Context, URLRecords []*model.URLRecord, userId string) error {
+func (s *MemoryURLStorage) SaveShortURLBatch(_ context.Context, URLRecords []*model.URLRecord, userID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -88,7 +88,7 @@ func (s *MemoryURLStorage) SaveShortUrlBatch(_ context.Context, URLRecords []*mo
 		if ok {
 			return ErrShortURLExists
 		}
-		urls[record.ShortURL] = UserPair{UserId: userId, OriginalURL: record.OriginalURL}
+		urls[record.ShortURL] = UserPair{UserID: userID, OriginalURL: record.OriginalURL}
 
 		_, ok = backwardURLs[record.OriginalURL]
 		if ok {
@@ -96,11 +96,11 @@ func (s *MemoryURLStorage) SaveShortUrlBatch(_ context.Context, URLRecords []*mo
 		}
 		backwardURLs[record.OriginalURL] = record.ShortURL
 
-		userURLList, ok := s.userMap[userId]
+		userURLList, ok := s.userMap[userID]
 		if !ok {
-			s.userMap[userId] = []*model.UserRecord{{ShortURL: record.ShortURL, OriginalURL: record.OriginalURL}}
+			s.userMap[userID] = []*model.UserRecord{{ShortURL: record.ShortURL, OriginalURL: record.OriginalURL}}
 		} else {
-			s.userMap[userId] = append(userURLList, &model.UserRecord{ShortURL: record.ShortURL, OriginalURL: record.OriginalURL})
+			s.userMap[userID] = append(userURLList, &model.UserRecord{ShortURL: record.ShortURL, OriginalURL: record.OriginalURL})
 		}
 	}
 	s.urls = urls
@@ -108,8 +108,8 @@ func (s *MemoryURLStorage) SaveShortUrlBatch(_ context.Context, URLRecords []*mo
 	return nil
 }
 
-func (s *MemoryURLStorage) GetUserURLs(_ context.Context, userId string) ([]*model.UserRecord, error) {
-	pairs, ok := s.userMap[userId]
+func (s *MemoryURLStorage) GetUserURLs(_ context.Context, userID string) ([]*model.UserRecord, error) {
+	pairs, ok := s.userMap[userID]
 	if !ok {
 		return nil, ErrUserNotFound
 	}
@@ -127,11 +127,11 @@ func arrangeMap(oldMap map[string]UserPair) map[string]string {
 func setUserMap(oldMap map[string]UserPair) map[string][]*model.UserRecord {
 	userMap := make(map[string][]*model.UserRecord)
 	for k, v := range oldMap {
-		userId, ok := userMap[v.UserId]
+		userID, ok := userMap[v.UserID]
 		if !ok {
-			userMap[v.UserId] = []*model.UserRecord{{ShortURL: k, OriginalURL: v.OriginalURL}}
+			userMap[v.UserID] = []*model.UserRecord{{ShortURL: k, OriginalURL: v.OriginalURL}}
 		} else {
-			userMap[v.UserId] = append(userId, &model.UserRecord{ShortURL: k, OriginalURL: v.OriginalURL})
+			userMap[v.UserID] = append(userID, &model.UserRecord{ShortURL: k, OriginalURL: v.OriginalURL})
 		}
 	}
 	return userMap

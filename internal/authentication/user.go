@@ -44,11 +44,11 @@ func AuthMiddleware(log *zap.Logger, jwtBuilder JWTBuilder) func(http.Handler) h
 
 				handler.ServeHTTP(writer, request)
 			} else {
-				userId, err := jwtBuilder.GetUserID(jwtCookie.Value)
-				if errors.Is(err, ErrNoUserIdExists) {
+				userID, err := jwtBuilder.GetUserID(jwtCookie.Value)
+				if errors.Is(err, ErrNoUserIDExists) {
 					http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 				}
-				request.Header.Set("userID", userId)
+				request.Header.Set("userID", userID)
 				handler.ServeHTTP(writer, request)
 			}
 		})

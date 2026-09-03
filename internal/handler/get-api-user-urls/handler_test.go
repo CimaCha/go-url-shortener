@@ -1,4 +1,4 @@
-package get_api_user_urls
+package userurls
 
 import (
 	"errors"

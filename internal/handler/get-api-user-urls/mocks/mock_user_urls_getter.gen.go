@@ -42,16 +42,16 @@ func (m *MockUserURLsGetter) EXPECT() *MockUserURLsGetterMockRecorder {
 }
 
 // GetUserURLs mocks base method.
-func (m *MockUserURLsGetter) GetUserURLs(ctx context.Context, userId string) ([]*model.UserRecord, error) {
+func (m *MockUserURLsGetter) GetUserURLs(ctx context.Context, userID string) ([]*model.UserRecord, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUserURLs", ctx, userId)
+	ret := m.ctrl.Call(m, "GetUserURLs", ctx, userID)
 	ret0, _ := ret[0].([]*model.UserRecord)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetUserURLs indicates an expected call of GetUserURLs.
-func (mr *MockUserURLsGetterMockRecorder) GetUserURLs(ctx, userId any) *gomock.Call {
+func (mr *MockUserURLsGetterMockRecorder) GetUserURLs(ctx, userID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserURLs", reflect.TypeOf((*MockUserURLsGetter)(nil).GetUserURLs), ctx, userId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserURLs", reflect.TypeOf((*MockUserURLsGetter)(nil).GetUserURLs), ctx, userID)
 }

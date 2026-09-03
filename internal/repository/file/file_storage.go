@@ -32,7 +32,7 @@ func NewFileStorage(filePath string) (*Storage, error) {
 
 	urls := make(map[string]repository.UserPair, len(records))
 	for _, record := range records {
-		urls[record.ShortURL] = repository.UserPair{UserId: record.UserId, OriginalURL: record.OriginalURL}
+		urls[record.ShortURL] = repository.UserPair{UserID: record.UserID, OriginalURL: record.OriginalURL}
 	}
 	memory := repository.NewMemoryURLStorage(urls)
 
@@ -42,11 +42,11 @@ func NewFileStorage(filePath string) (*Storage, error) {
 	}, nil
 }
 
-func (f *Storage) SaveShortURL(ctx context.Context, shortURL, fullURL, userId string) (string, error) {
+func (f *Storage) SaveShortURL(ctx context.Context, shortURL, fullURL, userID string) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	if storedShortURL, err := f.memory.SaveShortURL(ctx, shortURL, fullURL, userId); err != nil {
+	if storedShortURL, err := f.memory.SaveShortURL(ctx, shortURL, fullURL, userID); err != nil {
 		return storedShortURL, err
 	}
 
@@ -58,7 +58,7 @@ func (f *Storage) SaveShortURL(ctx context.Context, shortURL, fullURL, userId st
 			UUID:        strconv.Itoa(uuid),
 			ShortURL:    currentShortURL,
 			OriginalURL: userPair.OriginalURL,
-			UserId:      userPair.UserId,
+			UserID:      userPair.UserID,
 		})
 		uuid++
 	}
@@ -73,11 +73,11 @@ func (f *Storage) FindFullURL(ctx context.Context, shortURL string) (string, err
 	return f.memory.FindFullURL(ctx, shortURL)
 }
 
-func (f *Storage) SaveShortUrlBatch(ctx context.Context, URLRecords []*model.URLRecord, userId string) error {
+func (f *Storage) SaveShortURLBatch(ctx context.Context, URLRecords []*model.URLRecord, userID string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	if err := f.memory.SaveShortUrlBatch(ctx, URLRecords, userId); err != nil {
+	if err := f.memory.SaveShortURLBatch(ctx, URLRecords, userID); err != nil {
 		return err
 	}
 
@@ -89,7 +89,7 @@ func (f *Storage) SaveShortUrlBatch(ctx context.Context, URLRecords []*model.URL
 			UUID:        strconv.Itoa(uuid),
 			ShortURL:    currentShortURL,
 			OriginalURL: userPair.OriginalURL,
-			UserId:      userPair.UserId,
+			UserID:      userPair.UserID,
 		})
 		uuid++
 	}
@@ -100,6 +100,6 @@ func (f *Storage) SaveShortUrlBatch(ctx context.Context, URLRecords []*model.URL
 	return nil
 }
 
-func (f *Storage) GetUserURLs(ctx context.Context, userId string) ([]*model.UserRecord, error) {
-	return f.memory.GetUserURLs(ctx, userId)
+func (f *Storage) GetUserURLs(ctx context.Context, userID string) ([]*model.UserRecord, error) {
+	return f.memory.GetUserURLs(ctx, userID)
 }

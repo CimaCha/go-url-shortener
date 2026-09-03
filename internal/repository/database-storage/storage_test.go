@@ -70,7 +70,7 @@ func TestStorage(t *testing.T) {
 			run: func(t *testing.T, ctx context.Context, storage *Storage) {
 				_, err := storage.SaveShortURL(ctx, "existing", "https://example.com/existing", "")
 				require.NoError(t, err)
-				err = storage.SaveShortUrlBatch(ctx, []*model.URLRecord{
+				err = storage.SaveShortURLBatch(ctx, []*model.URLRecord{
 					{ShortURL: "new", OriginalURL: "https://example.com/new"},
 					{ShortURL: "existing", OriginalURL: "https://example.com/collision"},
 				}, "")
@@ -84,7 +84,7 @@ func TestStorage(t *testing.T) {
 			run: func(t *testing.T, ctx context.Context, storage *Storage) {
 				_, err := storage.SaveShortURL(ctx, "existing", "https://example.com/existing", "")
 				require.NoError(t, err)
-				err = storage.SaveShortUrlBatch(ctx, []*model.URLRecord{
+				err = storage.SaveShortURLBatch(ctx, []*model.URLRecord{
 					{ShortURL: "new", OriginalURL: "https://example.com/new"},
 					{ShortURL: "other", OriginalURL: "https://example.com/existing"},
 				}, "")

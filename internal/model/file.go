@@ -4,5 +4,5 @@ type FileRecord struct {
 	UUID        string `json:"uuid,omitempty"`
 	ShortURL    string `json:"short_url,omitempty"`
 	OriginalURL string `json:"original_url,omitempty"`
-	UserId      string `json:"user_id,omitempty"`
+	UserID      string `json:"user_id,omitempty"`
 }

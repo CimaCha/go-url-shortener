@@ -57,45 +57,45 @@ func (mr *MockURLStorageMockRecorder) FindFullURL(ctx, shortURL any) *gomock.Cal
 }
 
 // GetUserURLs mocks base method.
-func (m *MockURLStorage) GetUserURLs(ctx context.Context, userId string) ([]*model.UserRecord, error) {
+func (m *MockURLStorage) GetUserURLs(ctx context.Context, userID string) ([]*model.UserRecord, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUserURLs", ctx, userId)
+	ret := m.ctrl.Call(m, "GetUserURLs", ctx, userID)
 	ret0, _ := ret[0].([]*model.UserRecord)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetUserURLs indicates an expected call of GetUserURLs.
-func (mr *MockURLStorageMockRecorder) GetUserURLs(ctx, userId any) *gomock.Call {
+func (mr *MockURLStorageMockRecorder) GetUserURLs(ctx, userID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserURLs", reflect.TypeOf((*MockURLStorage)(nil).GetUserURLs), ctx, userId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserURLs", reflect.TypeOf((*MockURLStorage)(nil).GetUserURLs), ctx, userID)
 }
 
 // SaveShortURL mocks base method.
-func (m *MockURLStorage) SaveShortURL(ctx context.Context, shortURL, fullURL, userId string) (string, error) {
+func (m *MockURLStorage) SaveShortURL(ctx context.Context, shortURL, fullURL, userID string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SaveShortURL", ctx, shortURL, fullURL, userId)
+	ret := m.ctrl.Call(m, "SaveShortURL", ctx, shortURL, fullURL, userID)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // SaveShortURL indicates an expected call of SaveShortURL.
-func (mr *MockURLStorageMockRecorder) SaveShortURL(ctx, shortURL, fullURL, userId any) *gomock.Call {
+func (mr *MockURLStorageMockRecorder) SaveShortURL(ctx, shortURL, fullURL, userID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveShortURL", reflect.TypeOf((*MockURLStorage)(nil).SaveShortURL), ctx, shortURL, fullURL, userId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveShortURL", reflect.TypeOf((*MockURLStorage)(nil).SaveShortURL), ctx, shortURL, fullURL, userID)
 }
 
-// SaveShortUrlBatch mocks base method.
-func (m *MockURLStorage) SaveShortUrlBatch(ctx context.Context, URLRecords []*model.URLRecord, userId string) error {
+// SaveShortURLBatch mocks base method.
+func (m *MockURLStorage) SaveShortURLBatch(ctx context.Context, URLRecords []*model.URLRecord, userID string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SaveShortUrlBatch", ctx, URLRecords, userId)
+	ret := m.ctrl.Call(m, "SaveShortURLBatch", ctx, URLRecords, userID)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// SaveShortUrlBatch indicates an expected call of SaveShortUrlBatch.
-func (mr *MockURLStorageMockRecorder) SaveShortUrlBatch(ctx, URLRecords, userId any) *gomock.Call {
+// SaveShortURLBatch indicates an expected call of SaveShortURLBatch.
+func (mr *MockURLStorageMockRecorder) SaveShortURLBatch(ctx, URLRecords, userID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveShortUrlBatch", reflect.TypeOf((*MockURLStorage)(nil).SaveShortUrlBatch), ctx, URLRecords, userId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveShortURLBatch", reflect.TypeOf((*MockURLStorage)(nil).SaveShortURLBatch), ctx, URLRecords, userID)
 }

@@ -102,7 +102,7 @@ func TestMemoryURLStorageBatchCollisionIsAtomic(t *testing.T) {
 		"existing": {OriginalURL: "https://example.com/existing"},
 	})
 
-	err := storage.SaveShortUrlBatch(ctx, []*model.URLRecord{
+	err := storage.SaveShortURLBatch(ctx, []*model.URLRecord{
 		{ShortURL: "new", OriginalURL: "https://example.com/new"},
 		{ShortURL: "existing", OriginalURL: "https://example.com/collision"},
 	}, "")
@@ -117,7 +117,7 @@ func TestMemoryURLStorageBatchRejectsInternalDuplicate(t *testing.T) {
 	ctx := context.Background()
 	storage := NewMemoryURLStorage(make(map[string]UserPair))
 
-	err := storage.SaveShortUrlBatch(ctx, []*model.URLRecord{
+	err := storage.SaveShortURLBatch(ctx, []*model.URLRecord{
 		{ShortURL: "duplicate", OriginalURL: "https://example.com/first"},
 		{ShortURL: "duplicate", OriginalURL: "https://example.com/second"},
 	}, "")

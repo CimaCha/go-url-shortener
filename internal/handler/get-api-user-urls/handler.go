@@ -1,4 +1,4 @@
-package get_api_user_urls
+package userurls
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 //go:generate mockgen -source=handler.go -destination=mocks/mock_user_urls_getter.gen.go -package=mocks
 
 type UserURLsGetter interface {
-	GetUserURLs(ctx context.Context, userId string) ([]*model.UserRecord, error)
+	GetUserURLs(ctx context.Context, userID string) ([]*model.UserRecord, error)
 }
 
 func NewHandler(log zap.Logger, service UserURLsGetter, defaultShortAddress string) Handler {
@@ -29,9 +29,9 @@ type Handler struct {
 
 func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
-	userId := req.Header.Get("userID")
+	userID := req.Header.Get("userID")
 
-	userURLsList, err := h.service.GetUserURLs(req.Context(), userId)
+	userURLsList, err := h.service.GetUserURLs(req.Context(), userID)
 	if err != nil {
 		if errors.Is(err, service.ErrUserNotFound) {
 			res.WriteHeader(http.StatusNoContent)
