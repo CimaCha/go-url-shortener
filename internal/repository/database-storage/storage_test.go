@@ -31,7 +31,7 @@ func TestStorage(t *testing.T) {
 		{
 			name: "saves and finds URL",
 			run: func(t *testing.T, ctx context.Context, storage *Storage) {
-				storedShortURL, err := storage.SaveShortURL(ctx, "short", "https://example.com")
+				storedShortURL, err := storage.SaveShortURL(ctx, "short", "https://example.com", "")
 				require.NoError(t, err)
 				require.Empty(t, storedShortURL)
 				fullURL, err := storage.FindFullURL(ctx, "short")
@@ -49,18 +49,18 @@ func TestStorage(t *testing.T) {
 		{
 			name: "maps duplicate error",
 			run: func(t *testing.T, ctx context.Context, storage *Storage) {
-				_, err := storage.SaveShortURL(ctx, "short", "https://example.com")
+				_, err := storage.SaveShortURL(ctx, "short", "https://example.com", "")
 				require.NoError(t, err)
-				_, err = storage.SaveShortURL(ctx, "short", "https://other.example.com")
+				_, err = storage.SaveShortURL(ctx, "short", "https://other.example.com", "")
 				require.ErrorIs(t, err, repository.ErrShortURLExists)
 			},
 		},
 		{
 			name: "returns existing short URL for duplicate full URL",
 			run: func(t *testing.T, ctx context.Context, storage *Storage) {
-				_, err := storage.SaveShortURL(ctx, "first", "https://example.com")
+				_, err := storage.SaveShortURL(ctx, "first", "https://example.com", "")
 				require.NoError(t, err)
-				storedShortURL, err := storage.SaveShortURL(ctx, "second", "https://example.com")
+				storedShortURL, err := storage.SaveShortURL(ctx, "second", "https://example.com", "")
 				require.ErrorIs(t, err, repository.ErrFullURLExists)
 				require.Equal(t, "first", storedShortURL)
 			},
@@ -68,12 +68,12 @@ func TestStorage(t *testing.T) {
 		{
 			name: "rolls back batch and maps duplicate short URL",
 			run: func(t *testing.T, ctx context.Context, storage *Storage) {
-				_, err := storage.SaveShortURL(ctx, "existing", "https://example.com/existing")
+				_, err := storage.SaveShortURL(ctx, "existing", "https://example.com/existing", "")
 				require.NoError(t, err)
-				err = storage.SaveShortUrlBatch(ctx, []*model.URLRecord{
+				err = storage.SaveShortURLBatch(ctx, []*model.URLRecord{
 					{ShortURL: "new", OriginalURL: "https://example.com/new"},
 					{ShortURL: "existing", OriginalURL: "https://example.com/collision"},
-				})
+				}, "")
 				require.ErrorIs(t, err, repository.ErrShortURLExists)
 				_, err = storage.FindFullURL(ctx, "new")
 				require.ErrorIs(t, err, repository.ErrURLNotFound)
@@ -82,12 +82,12 @@ func TestStorage(t *testing.T) {
 		{
 			name: "rolls back batch and maps duplicate full URL",
 			run: func(t *testing.T, ctx context.Context, storage *Storage) {
-				_, err := storage.SaveShortURL(ctx, "existing", "https://example.com/existing")
+				_, err := storage.SaveShortURL(ctx, "existing", "https://example.com/existing", "")
 				require.NoError(t, err)
-				err = storage.SaveShortUrlBatch(ctx, []*model.URLRecord{
+				err = storage.SaveShortURLBatch(ctx, []*model.URLRecord{
 					{ShortURL: "new", OriginalURL: "https://example.com/new"},
 					{ShortURL: "other", OriginalURL: "https://example.com/existing"},
-				})
+				}, "")
 				require.ErrorIs(t, err, repository.ErrFullURLExists)
 				_, err = storage.FindFullURL(ctx, "new")
 				require.ErrorIs(t, err, repository.ErrURLNotFound)

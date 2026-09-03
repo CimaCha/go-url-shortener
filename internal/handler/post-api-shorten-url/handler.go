@@ -15,7 +15,7 @@ import (
 //go:generate mockgen -source=handler.go -destination=mocks/mock_url_handler.gen.go -package=mocks
 
 type Shortener interface {
-	Shorten(ctx context.Context, fullURL string) (string, error)
+	Shorten(ctx context.Context, fullURL, userID string) (string, error)
 }
 
 type Handler struct {
@@ -45,10 +45,18 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, err.Error(), http.StatusBadRequest)
 		return
 	}
-	url, err := h.service.Shorten(req.Context(), decodedBody.URL)
+	url, err := h.service.Shorten(req.Context(), decodedBody.URL, req.Header.Get("userID"))
 	if err != nil {
 		if errors.Is(err, service.ErrFullURLExists) {
-			res = h.createResponse(res, url, http.StatusConflict)
+			var encodedBody model.ShortenURLResponse
+			encodedBody.Result = fmt.Sprintf("%s/%s", h.defaultShortAddress, url)
+			responseBody, err := json.Marshal(encodedBody)
+			if err != nil {
+				http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			}
+			res.Header().Set("Content-Type", "application/json")
+			res.WriteHeader(http.StatusConflict)
+			_, _ = res.Write(responseBody)
 			return
 		}
 		if errors.Is(err, service.ErrEmptyURL) {
@@ -60,19 +68,13 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	res = h.createResponse(res, url, http.StatusCreated)
-}
-
-func (h Handler) createResponse(res http.ResponseWriter, url string, status int) http.ResponseWriter {
 	var encodedBody model.ShortenURLResponse
 	encodedBody.Result = fmt.Sprintf("%s/%s", h.defaultShortAddress, url)
 	responseBody, err := json.Marshal(encodedBody)
 	if err != nil {
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return res
 	}
 	res.Header().Set("Content-Type", "application/json")
-	res.WriteHeader(status)
+	res.WriteHeader(http.StatusCreated)
 	_, _ = res.Write(responseBody)
-	return res
 }

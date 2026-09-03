@@ -1,6 +1,7 @@
 package router
 
 import (
+	"github.com/CimaCha/go-url-shortener/internal/authentication"
 	"net/http"
 
 	"github.com/CimaCha/go-url-shortener/internal/compression"
@@ -10,10 +11,11 @@ import (
 	"go.uber.org/zap"
 )
 
-func New(log *zap.Logger, shortenURLHandler, apiShortenURLHandler, getFullURLHandler, pingHandler, apiShortenBatchHandler http.Handler) http.Handler {
+func New(log *zap.Logger, jwtBuilder authentication.JWTBuilder, shortenURLHandler, apiShortenURLHandler, getFullURLHandler, pingHandler, apiShortenBatchHandler, userURLsHandler http.Handler) http.Handler {
 	router := chi.NewRouter()
 	router.Use(logger.RequestLogger(log))
 	router.Use(compression.GzipMiddleware(log))
+	router.Use(authentication.AuthMiddleware(log, jwtBuilder))
 	router.With(middleware.AllowContentType("text/plain")).
 		Method(http.MethodPost, "/", shortenURLHandler)
 	router.With(middleware.AllowContentType("application/json")).
@@ -22,5 +24,6 @@ func New(log *zap.Logger, shortenURLHandler, apiShortenURLHandler, getFullURLHan
 		Method(http.MethodPost, "/api/shorten/batch", apiShortenBatchHandler)
 	router.Method(http.MethodGet, "/{id}", getFullURLHandler)
 	router.Method(http.MethodGet, "/ping", pingHandler)
+	router.Method(http.MethodGet, "/api/user/urls", userURLsHandler)
 	return router
 }

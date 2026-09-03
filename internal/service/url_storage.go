@@ -8,7 +8,8 @@ import (
 //go:generate mockgen -source=url_storage.go -destination=mocks/mock_url_storage.gen.go -package=mocks
 
 type URLStorage interface {
-	SaveShortURL(ctx context.Context, shortURL, fullURL string) (string, error)
+	SaveShortURL(ctx context.Context, shortURL, fullURL, userID string) (string, error)
 	FindFullURL(ctx context.Context, shortURL string) (string, error)
-	SaveShortUrlBatch(ctx context.Context, URLRecords []*model.URLRecord) error
+	SaveShortURLBatch(ctx context.Context, URLRecords []*model.URLRecord, userID string) error
+	GetUserURLs(ctx context.Context, userID string) ([]*model.UserRecord, error)
 }

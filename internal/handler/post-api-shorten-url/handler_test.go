@@ -38,7 +38,7 @@ func TestAPIShortenURLHandler(t *testing.T) {
 			body: `{"url":"https://example.com/path"}`,
 			setup: func(urlService *mocks.MockShortener, ctx context.Context) {
 				urlService.EXPECT().
-					Shorten(ctx, "https://example.com/path").
+					Shorten(ctx, "https://example.com/path", "user-id").
 					Return("short", nil)
 			},
 			wantStatus:      http.StatusCreated,
@@ -50,7 +50,7 @@ func TestAPIShortenURLHandler(t *testing.T) {
 			name: "empty URL",
 			body: `{}`,
 			setup: func(urlService *mocks.MockShortener, ctx context.Context) {
-				urlService.EXPECT().Shorten(ctx, "").Return("", service.ErrEmptyURL)
+				urlService.EXPECT().Shorten(ctx, "", "user-id").Return("", service.ErrEmptyURL)
 			},
 			wantStatus:      http.StatusBadRequest,
 			wantBody:        "empty URL\n",
@@ -60,7 +60,7 @@ func TestAPIShortenURLHandler(t *testing.T) {
 			name: "service error",
 			body: `{"url":"https://example.com/path"}`,
 			setup: func(urlService *mocks.MockShortener, ctx context.Context) {
-				urlService.EXPECT().Shorten(ctx, "https://example.com/path").Return("", errHandlerService)
+				urlService.EXPECT().Shorten(ctx, "https://example.com/path", "user-id").Return("", errHandlerService)
 			},
 			wantStatus:      http.StatusInternalServerError,
 			wantBody:        "Internal Server Error\n",
@@ -91,6 +91,7 @@ func TestAPIShortenURLHandler(t *testing.T) {
 				body = errorReader{}
 			}
 			request := httptest.NewRequest(http.MethodPost, "/api/shorten", body)
+			request.Header.Set("userID", "user-id")
 			if tt.setup != nil {
 				tt.setup(urlService, request.Context())
 			}

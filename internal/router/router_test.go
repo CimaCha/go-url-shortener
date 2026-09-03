@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/CimaCha/go-url-shortener/internal/authentication"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,6 +34,7 @@ func TestRouter(t *testing.T) {
 		{name: "unsupported batch API content type", method: http.MethodPost, path: "/api/shorten/batch", contentType: "text/plain", wantStatus: http.StatusUnsupportedMediaType},
 		{name: "get full URL", method: http.MethodGet, path: "/short", wantStatus: http.StatusTemporaryRedirect, wantHandler: "full", wantID: "short"},
 		{name: "ping database", method: http.MethodGet, path: "/ping", wantStatus: http.StatusOK, wantHandler: "ping"},
+		{name: "get user URLs", method: http.MethodGet, path: "/api/user/urls", wantStatus: http.StatusOK, wantHandler: "user-urls"},
 		{name: "method not allowed", method: http.MethodPut, path: "/", wantStatus: http.StatusMethodNotAllowed},
 	}
 
@@ -61,7 +63,11 @@ func TestRouter(t *testing.T) {
 				gotHandler = "ping"
 				res.WriteHeader(http.StatusOK)
 			})
-			router := New(zap.NewNop(), shortenURLHandler, apiShortenURLHandler, getFullURLHandler, pingHandler, apiShortenBatchHandler)
+			userURLsHandler := http.HandlerFunc(func(res http.ResponseWriter, _ *http.Request) {
+				gotHandler = "user-urls"
+				res.WriteHeader(http.StatusOK)
+			})
+			router := New(zap.NewNop(), authentication.JWTBuilder{SecretKey: []byte("test-secret")}, shortenURLHandler, apiShortenURLHandler, getFullURLHandler, pingHandler, apiShortenBatchHandler, userURLsHandler)
 			request := httptest.NewRequest(tt.method, tt.path, strings.NewReader("https://example.com"))
 			request.Header.Set("Content-Type", tt.contentType)
 			response := httptest.NewRecorder()
@@ -213,7 +219,7 @@ func TestRouterGzipMiddleware(t *testing.T) {
 				gotHandler = "full"
 				writer.WriteHeader(http.StatusTemporaryRedirect)
 			})
-			router := New(zap.NewNop(), shortenURLHandler, apiShortenURLHandler, getFullURLHandler, http.NotFoundHandler(), http.NotFoundHandler())
+			router := New(zap.NewNop(), authentication.JWTBuilder{SecretKey: []byte("test-secret")}, shortenURLHandler, apiShortenURLHandler, getFullURLHandler, http.NotFoundHandler(), http.NotFoundHandler(), http.NotFoundHandler())
 			request := httptest.NewRequest(http.MethodPost, tt.path, bytes.NewReader(tt.body(t)))
 			request.Header.Set("Content-Type", tt.contentType)
 			if tt.acceptEncoding != "" {
