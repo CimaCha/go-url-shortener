@@ -46,7 +46,7 @@ func TestAPIShortenBatchHandler(t *testing.T) {
 				urlService.EXPECT().ShortenBatch(ctx, []*model.OriginalURLRecord{
 					{CorrelationId: "first", OriginalURL: "https://example.com/first"},
 					{CorrelationId: "second", OriginalURL: "https://example.com/second"},
-				}).Return([]*model.ShortURLRecord{
+				}, "user-id").Return([]*model.ShortURLRecord{
 					{CorrelationId: "first", ShortURL: "short-first"},
 					{CorrelationId: "second", ShortURL: "short-second"},
 				}, nil)
@@ -63,7 +63,7 @@ func TestAPIShortenBatchHandler(t *testing.T) {
 			name: "empty batch",
 			body: `[]`,
 			setup: func(urlService *mocks.MockShortener, ctx context.Context) {
-				urlService.EXPECT().ShortenBatch(ctx, []*model.OriginalURLRecord{}).Return(nil, service.ErrEmptyURLList)
+				urlService.EXPECT().ShortenBatch(ctx, []*model.OriginalURLRecord{}, "user-id").Return(nil, service.ErrEmptyURLList)
 			},
 			wantStatus:      http.StatusBadRequest,
 			wantBody:        "empty URL list\n",
@@ -75,7 +75,7 @@ func TestAPIShortenBatchHandler(t *testing.T) {
 			setup: func(urlService *mocks.MockShortener, ctx context.Context) {
 				urlService.EXPECT().ShortenBatch(ctx, []*model.OriginalURLRecord{
 					{CorrelationId: "first", OriginalURL: "https://example.com/first"},
-				}).Return(nil, errBatchHandlerService)
+				}, "user-id").Return(nil, errBatchHandlerService)
 			},
 			wantStatus:      http.StatusInternalServerError,
 			wantBody:        "Internal Server Error\n",
@@ -106,6 +106,7 @@ func TestAPIShortenBatchHandler(t *testing.T) {
 				body = batchHandlerErrorReader{}
 			}
 			request := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", body)
+			request.Header.Set("userID", "user-id")
 			if tt.setup != nil {
 				tt.setup(urlService, request.Context())
 			}

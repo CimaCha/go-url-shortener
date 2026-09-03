@@ -14,7 +14,7 @@ import (
 //go:generate mockgen -source=handler.go -destination=mocks/mock_url_handler.gen.go -package=mocks
 
 type Shortener interface {
-	Shorten(ctx context.Context, fullURL string) (string, error)
+	Shorten(ctx context.Context, fullURL, userId string) (string, error)
 }
 
 type Handler struct {
@@ -39,7 +39,7 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	url, err := h.service.Shorten(req.Context(), string(body))
+	url, err := h.service.Shorten(req.Context(), string(body), req.Header.Get("userID"))
 	if err != nil {
 		if errors.Is(err, service.ErrFullURLExists) {
 			res = h.createResponse(res, url, http.StatusConflict)

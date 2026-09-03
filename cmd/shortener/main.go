@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"errors"
+	"github.com/CimaCha/go-url-shortener/internal/authentication"
+	userurls "github.com/CimaCha/go-url-shortener/internal/handler/get-api-user-urls"
 	apishortenbatch "github.com/CimaCha/go-url-shortener/internal/handler/post-api-shorten-batch"
 	"github.com/CimaCha/go-url-shortener/internal/repository"
-	database_storage "github.com/CimaCha/go-url-shortener/internal/repository/database-storage"
+	databasestorage "github.com/CimaCha/go-url-shortener/internal/repository/database-storage"
 	"github.com/CimaCha/go-url-shortener/internal/repository/file"
 	"log"
 	"net/http"
@@ -50,7 +52,7 @@ func run(log zap.Logger) error {
 
 	switch {
 	case cfg.DatabaseURL != "":
-		dbStorage, err := database_storage.NewDatabaseStorage(ctx, cfg.DatabaseURL)
+		dbStorage, err := databasestorage.NewDatabaseStorage(ctx, cfg.DatabaseURL)
 		if err != nil {
 			return err
 		}
@@ -67,7 +69,7 @@ func run(log zap.Logger) error {
 		storage = fileStorage
 
 	default:
-		storage = repository.NewMemoryURLStorage(make(map[string]string))
+		storage = repository.NewMemoryURLStorage(make(map[string]repository.UserPair))
 	}
 
 	urlService := service.NewService(storage)
@@ -76,14 +78,19 @@ func run(log zap.Logger) error {
 	apiShortenURLHandler := apishortenurl.NewAPIShortenURLHandler(*log.With(zap.String("handler", "api shorten URL")), urlService, cfg.BasicShortenAddress)
 	getFullURLHandler := fullurl.NewGetFullURLHandler(*log.With(zap.String("handler", "get full URL")), urlService)
 	apiShortenBatchHandler := apishortenbatch.NewAPIShortenBatchHandler(*log.With(zap.String("handler", "api shorten batch")), urlService, cfg.BasicShortenAddress)
+	userURLsHandler := userurls.NewHandler(*log.With(zap.String("handler", "get user URLs")), urlService, cfg.BasicShortenAddress)
+
+	jwtBuilder := authentication.NewJWTBuilder([]byte(cfg.SecretKey))
 
 	router := shortenerrouter.New(
 		log.With(zap.String("layer", "router")),
+		*jwtBuilder,
 		shortenURLHandler,
 		apiShortenURLHandler,
 		getFullURLHandler,
 		pingHandler,
-		apiShortenBatchHandler)
+		apiShortenBatchHandler,
+		userURLsHandler)
 
 	err = http.ListenAndServe(cfg.Address, router)
 	if err != nil {

@@ -11,22 +11,30 @@ import (
 
 var (
 	ErrURLNotFound    = errors.New("URL not found")
+	ErrUserNotFound   = errors.New("user not found")
 	ErrShortURLExists = errors.New("short URL already exists")
 	ErrFullURLExists  = errors.New("full URL already exists")
 )
 
 type MemoryURLStorage struct {
 	mu           sync.RWMutex
-	urls         map[string]string
+	urls         map[string]UserPair
 	backwardUrls map[string]string
+	userMap      map[string][]*model.UserRecord
 }
 
-func NewMemoryURLStorage(urls map[string]string) *MemoryURLStorage {
+type UserPair struct {
+	UserId      string
+	OriginalURL string
+}
+
+func NewMemoryURLStorage(urls map[string]UserPair) *MemoryURLStorage {
 	backwardUrls := arrangeMap(urls)
-	return &MemoryURLStorage{urls: urls, backwardUrls: backwardUrls}
+	userMap := setUserMap(urls)
+	return &MemoryURLStorage{urls: urls, backwardUrls: backwardUrls, userMap: userMap}
 }
 
-func (s *MemoryURLStorage) SaveShortURL(_ context.Context, shortURL, fullURL string) (string, error) {
+func (s *MemoryURLStorage) SaveShortURL(_ context.Context, shortURL, fullURL, userId string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	_, ok := s.urls[shortURL]
@@ -39,8 +47,14 @@ func (s *MemoryURLStorage) SaveShortURL(_ context.Context, shortURL, fullURL str
 		return storedShortURL, ErrFullURLExists
 	}
 
-	s.urls[shortURL] = fullURL
+	s.urls[shortURL] = UserPair{UserId: userId, OriginalURL: fullURL}
 	s.backwardUrls[fullURL] = shortURL
+	userURLList, ok := s.userMap[userId]
+	if !ok {
+		s.userMap[userId] = []*model.UserRecord{{ShortURL: shortURL, OriginalURL: fullURL}}
+	} else {
+		s.userMap[userId] = append(userURLList, &model.UserRecord{ShortURL: shortURL, OriginalURL: fullURL})
+	}
 	return "", nil
 }
 
@@ -48,22 +62,22 @@ func (s *MemoryURLStorage) FindFullURL(_ context.Context, shortURL string) (stri
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	fullURL, ok := s.urls[shortURL]
+	fullURLPair, ok := s.urls[shortURL]
 	if !ok {
 		return "", ErrURLNotFound
 	}
 
-	return fullURL, nil
+	return fullURLPair.OriginalURL, nil
 }
 
-func (s *MemoryURLStorage) Snapshot() map[string]string {
+func (s *MemoryURLStorage) Snapshot() map[string]UserPair {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return maps.Clone(s.urls)
 }
 
-func (s *MemoryURLStorage) SaveShortUrlBatch(_ context.Context, URLRecords []*model.URLRecord) error {
+func (s *MemoryURLStorage) SaveShortUrlBatch(_ context.Context, URLRecords []*model.URLRecord, userId string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -74,23 +88,51 @@ func (s *MemoryURLStorage) SaveShortUrlBatch(_ context.Context, URLRecords []*mo
 		if ok {
 			return ErrShortURLExists
 		}
-		urls[record.ShortURL] = record.OriginalURL
+		urls[record.ShortURL] = UserPair{UserId: userId, OriginalURL: record.OriginalURL}
 
 		_, ok = backwardURLs[record.OriginalURL]
 		if ok {
 			return ErrFullURLExists
 		}
 		backwardURLs[record.OriginalURL] = record.ShortURL
+
+		userURLList, ok := s.userMap[userId]
+		if !ok {
+			s.userMap[userId] = []*model.UserRecord{{ShortURL: record.ShortURL, OriginalURL: record.OriginalURL}}
+		} else {
+			s.userMap[userId] = append(userURLList, &model.UserRecord{ShortURL: record.ShortURL, OriginalURL: record.OriginalURL})
+		}
 	}
 	s.urls = urls
 	s.backwardUrls = backwardURLs
 	return nil
 }
 
-func arrangeMap(oldMap map[string]string) map[string]string {
+func (s *MemoryURLStorage) GetUserURLs(_ context.Context, userId string) ([]*model.UserRecord, error) {
+	pairs, ok := s.userMap[userId]
+	if !ok {
+		return nil, ErrUserNotFound
+	}
+	return pairs, nil
+}
+
+func arrangeMap(oldMap map[string]UserPair) map[string]string {
 	newMap := make(map[string]string)
 	for k, v := range oldMap {
-		newMap[v] = k
+		newMap[v.OriginalURL] = k
 	}
 	return newMap
+}
+
+func setUserMap(oldMap map[string]UserPair) map[string][]*model.UserRecord {
+	userMap := make(map[string][]*model.UserRecord)
+	for k, v := range oldMap {
+		userId, ok := userMap[v.UserId]
+		if !ok {
+			userMap[v.UserId] = []*model.UserRecord{{ShortURL: k, OriginalURL: v.OriginalURL}}
+		} else {
+			userMap[v.UserId] = append(userId, &model.UserRecord{ShortURL: k, OriginalURL: v.OriginalURL})
+		}
+	}
+	return userMap
 }

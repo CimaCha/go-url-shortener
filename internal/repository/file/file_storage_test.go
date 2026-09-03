@@ -137,7 +137,7 @@ func TestStorageSetShortURL(t *testing.T) {
 			var storedShortURL string
 			var setErr error
 			for _, write := range tt.writes {
-				storedShortURL, setErr = storage.SaveShortURL(ctx, write[0], write[1])
+				storedShortURL, setErr = storage.SaveShortURL(ctx, write[0], write[1], "")
 			}
 
 			assert.ErrorIs(t, setErr, tt.wantSetErr)
@@ -171,7 +171,7 @@ func TestStorageSetShortURLWriteFailure(t *testing.T) {
 			require.NoError(t, err)
 			storage.writer = NewWriter(filepath.Join(root, "missing", "storage.json"))
 
-			_, err = storage.SaveShortURL(ctx, "short", "https://example.com")
+			_, err = storage.SaveShortURL(ctx, "short", "https://example.com", "")
 
 			assert.ErrorIs(t, err, ErrOpenFileForWrite)
 			got, getErr := storage.FindFullURL(ctx, "short")
