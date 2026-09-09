@@ -5,14 +5,15 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-
 	"github.com/CimaCha/go-url-shortener/internal/model"
 	"github.com/CimaCha/go-url-shortener/internal/repository"
+	"sync"
 )
 
 const maxShortURLAttempts = 5
 
 var (
+	ErrURLHasGone     = errors.New("URL was deleted")
 	ErrEmptyURL       = errors.New("empty URL")
 	ErrEmptyURLList   = errors.New("empty URL list")
 	ErrURLNotFound    = errors.New("URL not found")
@@ -23,12 +24,22 @@ var (
 )
 
 type Service struct {
-	storage URLStorage
+	storage    URLStorage
+	numWorkers int
 }
 
-func NewService(storage URLStorage) Service {
+type Result struct {
+	shortURL    string
+	userID      string
+	originalURL string
+	deletedFlag bool
+	err         error
+}
+
+func NewService(storage URLStorage, numWorkers int) Service {
 	return Service{
-		storage: storage,
+		storage:    storage,
+		numWorkers: numWorkers,
 	}
 }
 
@@ -61,6 +72,9 @@ func (s Service) Resolve(ctx context.Context, shortURL string) (string, error) {
 	if err != nil {
 		if errors.Is(err, repository.ErrURLNotFound) {
 			return "", ErrURLNotFound
+		}
+		if errors.Is(err, repository.ErrURLHasGone) {
+			return "", ErrURLHasGone
 		}
 		return "", ErrRepository
 	}
@@ -109,4 +123,146 @@ func (s Service) GetUserURLs(ctx context.Context, userID string) ([]*model.UserR
 		return nil, fmt.Errorf("%w: get user URLs: %w", ErrRepository, err)
 	}
 	return userURLsList, nil
+}
+
+func (s Service) DeleteBatch(ctx context.Context, shortURLList []string, userID string) error {
+	resultCh := make(chan Result)
+	doneCh := make(chan struct{})
+	var wg sync.WaitGroup
+	resultArray := make([]string, 0)
+
+	// получаем канал с данными из генератора
+	inputChs := generator(shortURLList, doneCh)
+	fanOutChs := s.fanOut(ctx, doneCh, inputChs, s.numWorkers)
+	fanInCh := fanIn(doneCh, fanOutChs...)
+
+	for res := range fanInCh {
+		go func(res Result) {
+			wg.Add(1)
+			defer wg.Done()
+			if res.userID == userID && !res.deletedFlag {
+				resultCh <- res
+			}
+		}(res)
+	}
+
+	wg.Wait()
+
+	for res := range resultCh {
+		resultArray = append(resultArray, res.shortURL)
+	}
+
+	close(doneCh)
+
+	err := s.storage.DeleteURLsBatch(ctx, resultArray)
+	return err
+}
+
+func generator(shortURLsList []string, doneCh chan struct{}) chan string {
+	inputCh := make(chan string)
+
+	go func() {
+		defer close(inputCh)
+
+		for _, shortURL := range shortURLsList {
+			select {
+			case <-doneCh:
+				return
+			case inputCh <- shortURL:
+			}
+		}
+	}()
+
+	return inputCh
+}
+
+func (s Service) getShortURLData(ctx context.Context, doneCh chan struct{}, inputCh chan string) chan Result {
+	res := make(chan Result)
+
+	go func() {
+		defer close(res)
+
+		for data := range inputCh {
+			// замедлим вычисление, как будто функция add требует больше вычислительных ресурсов
+			shortURLData, err := s.storage.GetShortURLData(ctx, data)
+			result := Result{
+				shortURL:    data,
+				userID:      shortURLData.UserID,
+				originalURL: shortURLData.OriginalURL,
+				deletedFlag: shortURLData.DeletedFlag,
+				err:         err,
+			}
+
+			select {
+			case <-doneCh:
+				return
+			case res <- result:
+			}
+		}
+	}()
+	return res
+}
+
+func (s Service) fanOut(ctx context.Context, doneCh chan struct{}, inputCh chan string, numWorkers int) []chan Result {
+	channels := make([]chan Result, numWorkers)
+
+	for i := 0; i < numWorkers; i++ {
+		channels[i] = make(chan Result)
+		// получаем канал из горутины add
+		resultCh := s.getShortURLData(ctx, doneCh, inputCh)
+		// отправляем его в слайс каналов
+		channels[i] = resultCh
+	}
+
+	defer func() {
+		// Закрываем все каналы воркеров
+		for _, ch := range channels {
+			close(ch)
+		}
+	}()
+
+	return channels
+}
+
+func fanIn(doneCh chan struct{}, resultChs ...chan Result) chan Result {
+	// конечный выходной канал в который отправляем данные из всех каналов из слайса, назовём его результирующим
+	finalCh := make(chan Result)
+
+	// понадобится для ожидания всех горутин
+	var wg sync.WaitGroup
+
+	// перебираем все входящие каналы
+	for _, ch := range resultChs {
+		// в горутину передавать переменную цикла нельзя, поэтому делаем так
+		chClosure := ch
+
+		// инкрементируем счётчик горутин, которые нужно подождать
+		wg.Add(1)
+
+		go func() {
+			// откладываем сообщение о том, что горутина завершилась
+			defer wg.Done()
+
+			// получаем данные из канала
+			for data := range chClosure {
+				select {
+				// выходим из горутины, если канал закрылся
+				case <-doneCh:
+					return
+				// если не закрылся, отправляем данные в конечный выходной канал
+				case finalCh <- data:
+				}
+			}
+		}()
+	}
+
+	go func() {
+		// ждём завершения всех горутин
+		wg.Wait()
+		// когда все горутины завершились, закрываем результирующий канал
+		close(finalCh)
+	}()
+
+	// возвращаем результирующий канал
+	return finalCh
 }

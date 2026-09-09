@@ -30,9 +30,9 @@ func NewFileStorage(filePath string) (*Storage, error) {
 		return nil, fmt.Errorf("close storage reader: %w", closeErr)
 	}
 
-	urls := make(map[string]repository.UserPair, len(records))
+	urls := make(map[string]repository.URLData, len(records))
 	for _, record := range records {
-		urls[record.ShortURL] = repository.UserPair{UserID: record.UserID, OriginalURL: record.OriginalURL}
+		urls[record.ShortURL] = repository.URLData{UserID: record.UserID, OriginalURL: record.OriginalURL}
 	}
 	memory := repository.NewMemoryURLStorage(urls)
 
@@ -102,4 +102,12 @@ func (f *Storage) SaveShortURLBatch(ctx context.Context, URLRecords []*model.URL
 
 func (f *Storage) GetUserURLs(ctx context.Context, userID string) ([]*model.UserRecord, error) {
 	return f.memory.GetUserURLs(ctx, userID)
+}
+
+func (f *Storage) GetShortURLData(ctx context.Context, shortURL string) (*model.StorageRecord, error) {
+	return f.memory.GetShortURLData(ctx, shortURL)
+}
+
+func (f *Storage) DeleteURLsBatch(ctx context.Context, shortURLs []string) error {
+	return f.memory.DeleteURLsBatch(ctx, shortURLs)
 }

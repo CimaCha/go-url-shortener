@@ -55,7 +55,7 @@ func TestMemoryURLStorage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			storage := NewMemoryURLStorage(make(map[string]UserPair))
+			storage := NewMemoryURLStorage(make(map[string]URLData))
 			var storedShortURL string
 			var setErr error
 			for _, write := range tt.writes {
@@ -82,12 +82,12 @@ func TestMemoryURLStorageSnapshot(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			storage := NewMemoryURLStorage(make(map[string]UserPair))
+			storage := NewMemoryURLStorage(make(map[string]URLData))
 			_, err := storage.SaveShortURL(ctx, "short", "https://example.com", "")
 			assert.NoError(t, err)
 
 			snapshot := storage.Snapshot()
-			snapshot["short"] = UserPair{OriginalURL: "changed"}
+			snapshot["short"] = URLData{OriginalURL: "changed"}
 
 			got, err := storage.FindFullURL(ctx, "short")
 			assert.NoError(t, err)
@@ -98,7 +98,7 @@ func TestMemoryURLStorageSnapshot(t *testing.T) {
 
 func TestMemoryURLStorageBatchCollisionIsAtomic(t *testing.T) {
 	ctx := context.Background()
-	storage := NewMemoryURLStorage(map[string]UserPair{
+	storage := NewMemoryURLStorage(map[string]URLData{
 		"existing": {OriginalURL: "https://example.com/existing"},
 	})
 
@@ -108,14 +108,14 @@ func TestMemoryURLStorageBatchCollisionIsAtomic(t *testing.T) {
 	}, "")
 
 	assert.ErrorIs(t, err, ErrShortURLExists)
-	assert.Equal(t, map[string]UserPair{
+	assert.Equal(t, map[string]URLData{
 		"existing": {OriginalURL: "https://example.com/existing"},
 	}, storage.Snapshot())
 }
 
 func TestMemoryURLStorageBatchRejectsInternalDuplicate(t *testing.T) {
 	ctx := context.Background()
-	storage := NewMemoryURLStorage(make(map[string]UserPair))
+	storage := NewMemoryURLStorage(make(map[string]URLData))
 
 	err := storage.SaveShortURLBatch(ctx, []*model.URLRecord{
 		{ShortURL: "duplicate", OriginalURL: "https://example.com/first"},

@@ -12,4 +12,6 @@ type URLStorage interface {
 	FindFullURL(ctx context.Context, shortURL string) (string, error)
 	SaveShortURLBatch(ctx context.Context, URLRecords []*model.URLRecord, userID string) error
 	GetUserURLs(ctx context.Context, userID string) ([]*model.UserRecord, error)
+	GetShortURLData(ctx context.Context, shortURL string) (*model.StorageRecord, error)
+	DeleteURLsBatch(ctx context.Context, shortURLs []string) error
 }

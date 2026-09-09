@@ -13,17 +13,17 @@ import (
 
 //go:generate mockgen -source=handler.go -destination=mocks/mock_user_urls_getter.gen.go -package=mocks
 
-type UserURLsGetter interface {
+type Getter interface {
 	GetUserURLs(ctx context.Context, userID string) ([]*model.UserRecord, error)
 }
 
-func NewHandler(log zap.Logger, service UserURLsGetter, defaultShortAddress string) Handler {
+func NewHandler(log zap.Logger, service Getter, defaultShortAddress string) Handler {
 	return Handler{log: log, service: service, defaultShortAddress: defaultShortAddress}
 }
 
 type Handler struct {
 	log                 zap.Logger
-	service             UserURLsGetter
+	service             Getter
 	defaultShortAddress string
 }
 

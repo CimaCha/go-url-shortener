@@ -134,3 +134,23 @@ func (s Storage) GetUserURLs(ctx context.Context, userID string) ([]*model.UserR
 	}
 	return userRecords, nil
 }
+
+func (s Storage) GetShortURLData(ctx context.Context, shortURL string) (*model.StorageRecord, error) {
+	var userRecord *model.StorageRecord
+
+	err := s.Pool.QueryRow(ctx, "SELECT user_id, full_url, deleted_flag FROM urls WHERE short_url = $1", shortURL).Scan(&userRecord)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, repository.ErrURLNotFound
+		} else {
+			return nil, err
+		}
+	}
+
+	return userRecord, nil
+}
+
+func (s Storage) DeleteURLsBatch(ctx context.Context, shortURLs []string) error {
+	_, err := s.Pool.Exec(ctx, "UPDATE urls SET deleted_flag = true WHERE short_url = ANY($1)", shortURLs)
+	return err
+}

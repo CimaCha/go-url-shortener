@@ -45,7 +45,7 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 			finalURL := fmt.Sprintf("%s/%s", h.defaultShortAddress, url)
 			res.Header().Set("Content-Type", "text/plain")
 			res.WriteHeader(http.StatusConflict)
-			_, err := res.Write([]byte(finalURL))
+			_, err = res.Write([]byte(finalURL))
 			if err != nil {
 				http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 

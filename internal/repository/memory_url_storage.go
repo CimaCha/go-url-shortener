@@ -10,6 +10,7 @@ import (
 )
 
 var (
+	ErrURLHasGone     = errors.New("URL was been deleted")
 	ErrURLNotFound    = errors.New("URL not found")
 	ErrUserNotFound   = errors.New("user not found")
 	ErrShortURLExists = errors.New("short URL already exists")
@@ -18,17 +19,18 @@ var (
 
 type MemoryURLStorage struct {
 	mu           sync.RWMutex
-	urls         map[string]UserPair
+	urls         map[string]URLData
 	backwardUrls map[string]string
 	userMap      map[string][]*model.UserRecord
 }
 
-type UserPair struct {
+type URLData struct {
 	UserID      string
 	OriginalURL string
+	DeletedFlag bool
 }
 
-func NewMemoryURLStorage(urls map[string]UserPair) *MemoryURLStorage {
+func NewMemoryURLStorage(urls map[string]URLData) *MemoryURLStorage {
 	backwardUrls := arrangeMap(urls)
 	userMap := setUserMap(urls)
 	return &MemoryURLStorage{urls: urls, backwardUrls: backwardUrls, userMap: userMap}
@@ -47,7 +49,7 @@ func (s *MemoryURLStorage) SaveShortURL(_ context.Context, shortURL, fullURL, us
 		return storedShortURL, ErrFullURLExists
 	}
 
-	s.urls[shortURL] = UserPair{UserID: userID, OriginalURL: fullURL}
+	s.urls[shortURL] = URLData{UserID: userID, OriginalURL: fullURL}
 	s.backwardUrls[fullURL] = shortURL
 	userURLList, ok := s.userMap[userID]
 	if !ok {
@@ -62,15 +64,18 @@ func (s *MemoryURLStorage) FindFullURL(_ context.Context, shortURL string) (stri
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	fullURLPair, ok := s.urls[shortURL]
+	fullURLData, ok := s.urls[shortURL]
 	if !ok {
 		return "", ErrURLNotFound
 	}
+	if fullURLData.DeletedFlag {
+		return "", ErrURLHasGone
+	}
 
-	return fullURLPair.OriginalURL, nil
+	return fullURLData.OriginalURL, nil
 }
 
-func (s *MemoryURLStorage) Snapshot() map[string]UserPair {
+func (s *MemoryURLStorage) Snapshot() map[string]URLData {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -88,7 +93,7 @@ func (s *MemoryURLStorage) SaveShortURLBatch(_ context.Context, URLRecords []*mo
 		if ok {
 			return ErrShortURLExists
 		}
-		urls[record.ShortURL] = UserPair{UserID: userID, OriginalURL: record.OriginalURL}
+		urls[record.ShortURL] = URLData{UserID: userID, OriginalURL: record.OriginalURL}
 
 		_, ok = backwardURLs[record.OriginalURL]
 		if ok {
@@ -109,6 +114,8 @@ func (s *MemoryURLStorage) SaveShortURLBatch(_ context.Context, URLRecords []*mo
 }
 
 func (s *MemoryURLStorage) GetUserURLs(_ context.Context, userID string) ([]*model.UserRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	pairs, ok := s.userMap[userID]
 	if !ok {
 		return nil, ErrUserNotFound
@@ -116,7 +123,29 @@ func (s *MemoryURLStorage) GetUserURLs(_ context.Context, userID string) ([]*mod
 	return pairs, nil
 }
 
-func arrangeMap(oldMap map[string]UserPair) map[string]string {
+func (s *MemoryURLStorage) GetShortURLData(_ context.Context, shortURL string) (*model.StorageRecord, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	URLInfo, ok := s.urls[shortURL]
+	if !ok {
+		return nil, ErrURLNotFound
+	}
+	return &model.StorageRecord{OriginalURL: URLInfo.OriginalURL, UserID: URLInfo.UserID, DeletedFlag: URLInfo.DeletedFlag}, nil
+}
+
+func (s *MemoryURLStorage) DeleteURLsBatch(_ context.Context, shortURLs []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var data URLData
+	for _, shortURL := range shortURLs {
+		data = s.urls[shortURL]
+		data.DeletedFlag = true
+		s.urls[shortURL] = data
+	}
+	return nil
+}
+
+func arrangeMap(oldMap map[string]URLData) map[string]string {
 	newMap := make(map[string]string)
 	for k, v := range oldMap {
 		newMap[v.OriginalURL] = k
@@ -124,7 +153,7 @@ func arrangeMap(oldMap map[string]UserPair) map[string]string {
 	return newMap
 }
 
-func setUserMap(oldMap map[string]UserPair) map[string][]*model.UserRecord {
+func setUserMap(oldMap map[string]URLData) map[string][]*model.UserRecord {
 	userMap := make(map[string][]*model.UserRecord)
 	for k, v := range oldMap {
 		userID, ok := userMap[v.UserID]

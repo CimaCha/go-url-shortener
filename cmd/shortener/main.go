@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/CimaCha/go-url-shortener/internal/authentication"
+	apideletebatch "github.com/CimaCha/go-url-shortener/internal/handler/delete-url-batch"
 	userurls "github.com/CimaCha/go-url-shortener/internal/handler/get-api-user-urls"
 	apishortenbatch "github.com/CimaCha/go-url-shortener/internal/handler/post-api-shorten-batch"
 	"github.com/CimaCha/go-url-shortener/internal/repository"
@@ -21,6 +22,10 @@ import (
 	shortenerrouter "github.com/CimaCha/go-url-shortener/internal/router"
 	"github.com/CimaCha/go-url-shortener/internal/service"
 	"go.uber.org/zap"
+)
+
+const (
+	maxNumWorkers = 5
 )
 
 func main() {
@@ -69,16 +74,17 @@ func run(log zap.Logger) error {
 		storage = fileStorage
 
 	default:
-		storage = repository.NewMemoryURLStorage(make(map[string]repository.UserPair))
+		storage = repository.NewMemoryURLStorage(make(map[string]repository.URLData))
 	}
 
-	urlService := service.NewService(storage)
+	urlService := service.NewService(storage, maxNumWorkers)
 
 	shortenURLHandler := shortenurl.NewShortenURLHandler(*log.With(zap.String("handler", "shorten URL")), urlService, cfg.BasicShortenAddress)
 	apiShortenURLHandler := apishortenurl.NewAPIShortenURLHandler(*log.With(zap.String("handler", "api shorten URL")), urlService, cfg.BasicShortenAddress)
 	getFullURLHandler := fullurl.NewGetFullURLHandler(*log.With(zap.String("handler", "get full URL")), urlService)
 	apiShortenBatchHandler := apishortenbatch.NewAPIShortenBatchHandler(*log.With(zap.String("handler", "api shorten batch")), urlService, cfg.BasicShortenAddress)
 	userURLsHandler := userurls.NewHandler(*log.With(zap.String("handler", "get user URLs")), urlService, cfg.BasicShortenAddress)
+	deleteURLsHandler := apideletebatch.NewAPIDeleteBatchHandler(*log.With(zap.String("handler", "delete URLs")), urlService)
 
 	jwtBuilder := authentication.NewJWTBuilder([]byte(cfg.SecretKey))
 
@@ -90,7 +96,8 @@ func run(log zap.Logger) error {
 		getFullURLHandler,
 		pingHandler,
 		apiShortenBatchHandler,
-		userURLsHandler)
+		userURLsHandler,
+		deleteURLsHandler)
 
 	err = http.ListenAndServe(cfg.Address, router)
 	if err != nil {
