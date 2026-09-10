@@ -40,6 +40,17 @@ func (r *Reader) ReadRecords() ([]*model.FileRecord, error) {
 	if err != nil {
 		return nil, ErrDecodeRecords
 	}
+	if records == nil {
+		return nil, ErrDecodeRecords
+	}
+	for _, record := range records {
+		if record == nil {
+			return nil, ErrDecodeRecords
+		}
+	}
+	if err := r.decoder.Decode(&struct{}{}); err != io.EOF {
+		return nil, ErrDecodeRecords
+	}
 	return records, nil
 }
 

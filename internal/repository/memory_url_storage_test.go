@@ -55,11 +55,11 @@ func TestMemoryURLStorage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			storage := NewMemoryURLStorage(make(map[string]string))
+			storage := NewMemoryURLStorage(make(map[string]URLData))
 			var storedShortURL string
 			var setErr error
 			for _, write := range tt.writes {
-				storedShortURL, setErr = storage.SaveShortURL(ctx, write[0], write[1])
+				storedShortURL, setErr = storage.SaveShortURL(ctx, write[0], write[1], "")
 			}
 
 			assert.ErrorIs(t, setErr, tt.wantSetErr)
@@ -82,12 +82,12 @@ func TestMemoryURLStorageSnapshot(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			storage := NewMemoryURLStorage(make(map[string]string))
-			_, err := storage.SaveShortURL(ctx, "short", "https://example.com")
+			storage := NewMemoryURLStorage(make(map[string]URLData))
+			_, err := storage.SaveShortURL(ctx, "short", "https://example.com", "")
 			assert.NoError(t, err)
 
 			snapshot := storage.Snapshot()
-			snapshot["short"] = "changed"
+			snapshot["short"] = URLData{OriginalURL: "changed"}
 
 			got, err := storage.FindFullURL(ctx, "short")
 			assert.NoError(t, err)
@@ -98,29 +98,68 @@ func TestMemoryURLStorageSnapshot(t *testing.T) {
 
 func TestMemoryURLStorageBatchCollisionIsAtomic(t *testing.T) {
 	ctx := context.Background()
-	storage := NewMemoryURLStorage(map[string]string{
-		"existing": "https://example.com/existing",
+	storage := NewMemoryURLStorage(map[string]URLData{
+		"existing": {OriginalURL: "https://example.com/existing"},
 	})
 
-	err := storage.SaveShortUrlBatch(ctx, []*model.URLRecord{
+	err := storage.SaveShortURLBatch(ctx, []*model.URLRecord{
 		{ShortURL: "new", OriginalURL: "https://example.com/new"},
 		{ShortURL: "existing", OriginalURL: "https://example.com/collision"},
-	})
+	}, "")
 
 	assert.ErrorIs(t, err, ErrShortURLExists)
-	assert.Equal(t, map[string]string{
-		"existing": "https://example.com/existing",
+	assert.Equal(t, map[string]URLData{
+		"existing": {OriginalURL: "https://example.com/existing"},
 	}, storage.Snapshot())
+	userURLs, getErr := storage.GetUserURLs(ctx, "")
+	assert.NoError(t, getErr)
+	assert.Equal(t, []*model.UserRecord{{ShortURL: "existing", OriginalURL: "https://example.com/existing"}}, userURLs)
+}
+
+func TestMemoryURLStorageDeletesOnlyOwnedURLs(t *testing.T) {
+	ctx := context.Background()
+	storage := NewMemoryURLStorage(map[string]URLData{
+		"own":     {UserID: "user-id", OriginalURL: "https://example.com/own"},
+		"foreign": {UserID: "other-user", OriginalURL: "https://example.com/foreign"},
+	})
+
+	err := storage.DeleteURLsBatch(ctx, []string{"own", "foreign", "missing"}, "user-id")
+
+	assert.NoError(t, err)
+	_, err = storage.FindFullURL(ctx, "own")
+	assert.ErrorIs(t, err, ErrURLHasGone)
+	got, err := storage.FindFullURL(ctx, "foreign")
+	assert.NoError(t, err)
+	assert.Equal(t, "https://example.com/foreign", got)
+	assert.NotContains(t, storage.Snapshot(), "missing")
+}
+
+func TestMemoryURLStorageGetShortURLData(t *testing.T) {
+	ctx := context.Background()
+	storage := NewMemoryURLStorage(map[string]URLData{
+		"active":  {UserID: "user-id", OriginalURL: "https://example.com/active"},
+		"deleted": {UserID: "user-id", OriginalURL: "https://example.com/deleted", DeletedFlag: true},
+	})
+
+	active, err := storage.GetShortURLData(ctx, "active")
+	assert.NoError(t, err)
+	assert.Equal(t, &model.StorageRecord{UserID: "user-id", OriginalURL: "https://example.com/active"}, active)
+	deleted, err := storage.GetShortURLData(ctx, "deleted")
+	assert.NoError(t, err)
+	assert.Equal(t, &model.StorageRecord{UserID: "user-id", OriginalURL: "https://example.com/deleted", DeletedFlag: true}, deleted)
+	missing, err := storage.GetShortURLData(ctx, "missing")
+	assert.ErrorIs(t, err, ErrURLNotFound)
+	assert.Nil(t, missing)
 }
 
 func TestMemoryURLStorageBatchRejectsInternalDuplicate(t *testing.T) {
 	ctx := context.Background()
-	storage := NewMemoryURLStorage(make(map[string]string))
+	storage := NewMemoryURLStorage(make(map[string]URLData))
 
-	err := storage.SaveShortUrlBatch(ctx, []*model.URLRecord{
+	err := storage.SaveShortURLBatch(ctx, []*model.URLRecord{
 		{ShortURL: "duplicate", OriginalURL: "https://example.com/first"},
 		{ShortURL: "duplicate", OriginalURL: "https://example.com/second"},
-	})
+	}, "")
 
 	assert.ErrorIs(t, err, ErrShortURLExists)
 	assert.Empty(t, storage.Snapshot())

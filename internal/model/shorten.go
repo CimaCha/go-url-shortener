@@ -7,3 +7,9 @@ type ShortenURLRequest struct {
 type ShortenURLResponse struct {
 	Result string `json:"result,omitempty"`
 }
+
+type StorageRecord struct {
+	UserID      string
+	OriginalURL string
+	DeletedFlag bool
+}

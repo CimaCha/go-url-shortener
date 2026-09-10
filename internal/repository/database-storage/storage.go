@@ -42,9 +42,9 @@ func NewDatabaseStorage(ctx context.Context, databaseURL string) (*Storage, erro
 	return &Storage{Pool: pool}, nil
 }
 
-func (s Storage) SaveShortURL(ctx context.Context, shortURL, fullURL string) (string, error) {
+func (s Storage) SaveShortURL(ctx context.Context, shortURL, fullURL, userID string) (string, error) {
 	var storedFullURL string
-	err := s.Pool.QueryRow(ctx, "INSERT INTO urls(short_url, full_url) VALUES ($1,$2) ON CONFLICT (full_url) DO UPDATE SET full_url=urls.full_url RETURNING urls.short_url;", shortURL, fullURL).Scan(&storedFullURL)
+	err := s.Pool.QueryRow(ctx, "INSERT INTO urls(short_url, full_url, user_id) VALUES ($1,$2, $3) ON CONFLICT (full_url) DO UPDATE SET full_url=urls.full_url RETURNING urls.short_url;", shortURL, fullURL, userID).Scan(&storedFullURL)
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 		return "", repository.ErrShortURLExists
@@ -58,12 +58,16 @@ func (s Storage) SaveShortURL(ctx context.Context, shortURL, fullURL string) (st
 
 func (s Storage) FindFullURL(ctx context.Context, shortURL string) (string, error) {
 	var fullURL string
-	err := s.Pool.QueryRow(ctx, "SELECT full_url FROM urls WHERE short_url = $1", shortURL).Scan(&fullURL)
+	var deleted bool
+	err := s.Pool.QueryRow(ctx, "SELECT full_url, COALESCE(deleted_flag, false) FROM urls WHERE short_url = $1", shortURL).Scan(&fullURL, &deleted)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", repository.ErrURLNotFound
 	}
 	if err != nil {
 		return "", err
+	}
+	if deleted {
+		return "", repository.ErrURLHasGone
 	}
 	return fullURL, nil
 }
@@ -76,7 +80,7 @@ func (s Storage) Ping(ctx context.Context) error {
 	return s.Pool.Ping(ctx)
 }
 
-func (s Storage) SaveShortUrlBatch(ctx context.Context, URLRecords []*model.URLRecord) error {
+func (s Storage) SaveShortURLBatch(ctx context.Context, URLRecords []*model.URLRecord, userID string) error {
 	// начинаем транзакцию
 	tx, err := s.Pool.Begin(ctx)
 	if err != nil {
@@ -87,13 +91,13 @@ func (s Storage) SaveShortUrlBatch(ctx context.Context, URLRecords []*model.URLR
 
 	var rows [][]interface{}
 	for _, urls := range URLRecords {
-		rows = append(rows, []interface{}{urls.ShortURL, urls.OriginalURL})
+		rows = append(rows, []interface{}{urls.ShortURL, urls.OriginalURL, userID})
 	}
 
 	_, err = tx.CopyFrom(
 		ctx,
 		pgx.Identifier{"urls"},
-		[]string{"short_url", "full_url"},
+		[]string{"short_url", "full_url", "user_id"},
 		pgx.CopyFromRows(rows),
 	)
 
@@ -110,4 +114,47 @@ func (s Storage) SaveShortUrlBatch(ctx context.Context, URLRecords []*model.URLR
 
 	// завершаем транзакцию
 	return tx.Commit(ctx)
+}
+
+func (s Storage) GetUserURLs(ctx context.Context, userID string) ([]*model.UserRecord, error) {
+	var userRecords []*model.UserRecord
+	rows, err := s.Pool.Query(ctx, "SELECT full_url, short_url FROM urls WHERE user_id = $1", userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, repository.ErrUserNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var userRecord model.UserRecord
+		err = rows.Scan(&userRecord.OriginalURL, &userRecord.ShortURL)
+		if err != nil {
+			return nil, err
+		}
+
+		userRecords = append(userRecords, &userRecord)
+	}
+	return userRecords, nil
+}
+
+func (s Storage) GetShortURLData(ctx context.Context, shortURL string) (*model.StorageRecord, error) {
+	data := &model.StorageRecord{}
+	err := s.Pool.QueryRow(ctx,
+		"SELECT user_id, full_url, COALESCE(deleted_flag, false) FROM urls WHERE short_url = $1",
+		shortURL,
+	).Scan(&data.UserID, &data.OriginalURL, &data.DeletedFlag)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, repository.ErrURLNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func (s Storage) DeleteURLsBatch(ctx context.Context, shortURLs []string, userID string) error {
+	_, err := s.Pool.Exec(ctx, "UPDATE urls SET deleted_flag = true WHERE short_url = ANY($1) AND user_id = $2", shortURLs, userID)
+	return err
 }

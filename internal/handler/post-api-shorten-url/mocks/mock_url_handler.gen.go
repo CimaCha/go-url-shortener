@@ -41,16 +41,16 @@ func (m *MockShortener) EXPECT() *MockShortenerMockRecorder {
 }
 
 // Shorten mocks base method.
-func (m *MockShortener) Shorten(ctx context.Context, fullURL string) (string, error) {
+func (m *MockShortener) Shorten(ctx context.Context, fullURL, userID string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Shorten", ctx, fullURL)
+	ret := m.ctrl.Call(m, "Shorten", ctx, fullURL, userID)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Shorten indicates an expected call of Shorten.
-func (mr *MockShortenerMockRecorder) Shorten(ctx, fullURL any) *gomock.Call {
+func (mr *MockShortenerMockRecorder) Shorten(ctx, fullURL, userID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Shorten", reflect.TypeOf((*MockShortener)(nil).Shorten), ctx, fullURL)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Shorten", reflect.TypeOf((*MockShortener)(nil).Shorten), ctx, fullURL, userID)
 }

@@ -42,13 +42,13 @@ func TestReaderReadRecords(t *testing.T) {
 			wantErr: ErrDecodeRecords,
 		},
 		{
-			name: "reads only first array from stream",
+			name: "rejects second JSON value",
 			content: `[{"uuid":"1","short_url":"first"}]` + "\n" +
 				`[{"uuid":"2","short_url":"second"}]`,
-			want: []*model.FileRecord{
-				{UUID: "1", ShortURL: "first"},
-			},
+			wantErr: ErrDecodeRecords,
 		},
+		{name: "rejects null array", content: "null", wantErr: ErrDecodeRecords},
+		{name: "rejects null record", content: "[null]", wantErr: ErrDecodeRecords},
 	}
 
 	for _, tt := range tests {
