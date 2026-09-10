@@ -35,6 +35,7 @@ func TestRouter(t *testing.T) {
 		{name: "get full URL", method: http.MethodGet, path: "/short", wantStatus: http.StatusTemporaryRedirect, wantHandler: "full", wantID: "short"},
 		{name: "ping database", method: http.MethodGet, path: "/ping", wantStatus: http.StatusOK, wantHandler: "ping"},
 		{name: "get user URLs", method: http.MethodGet, path: "/api/user/urls", wantStatus: http.StatusOK, wantHandler: "user-urls"},
+		{name: "delete user URLs", method: http.MethodDelete, path: "/api/user/urls", contentType: "application/json", wantStatus: http.StatusAccepted, wantHandler: "delete-urls"},
 		{name: "method not allowed", method: http.MethodPut, path: "/", wantStatus: http.StatusMethodNotAllowed},
 	}
 
@@ -67,7 +68,11 @@ func TestRouter(t *testing.T) {
 				gotHandler = "user-urls"
 				res.WriteHeader(http.StatusOK)
 			})
-			router := New(zap.NewNop(), authentication.JWTBuilder{SecretKey: []byte("test-secret")}, shortenURLHandler, apiShortenURLHandler, getFullURLHandler, pingHandler, apiShortenBatchHandler, userURLsHandler)
+			deleteURLsHandler := http.HandlerFunc(func(res http.ResponseWriter, _ *http.Request) {
+				gotHandler = "delete-urls"
+				res.WriteHeader(http.StatusAccepted)
+			})
+			router := New(zap.NewNop(), authentication.JWTBuilder{SecretKey: []byte("test-secret")}, shortenURLHandler, apiShortenURLHandler, getFullURLHandler, pingHandler, apiShortenBatchHandler, userURLsHandler, deleteURLsHandler)
 			request := httptest.NewRequest(tt.method, tt.path, strings.NewReader("https://example.com"))
 			request.Header.Set("Content-Type", tt.contentType)
 			response := httptest.NewRecorder()
@@ -219,7 +224,7 @@ func TestRouterGzipMiddleware(t *testing.T) {
 				gotHandler = "full"
 				writer.WriteHeader(http.StatusTemporaryRedirect)
 			})
-			router := New(zap.NewNop(), authentication.JWTBuilder{SecretKey: []byte("test-secret")}, shortenURLHandler, apiShortenURLHandler, getFullURLHandler, http.NotFoundHandler(), http.NotFoundHandler(), http.NotFoundHandler())
+			router := New(zap.NewNop(), authentication.JWTBuilder{SecretKey: []byte("test-secret")}, shortenURLHandler, apiShortenURLHandler, getFullURLHandler, http.NotFoundHandler(), http.NotFoundHandler(), http.NotFoundHandler(), http.NotFoundHandler())
 			request := httptest.NewRequest(http.MethodPost, tt.path, bytes.NewReader(tt.body(t)))
 			request.Header.Set("Content-Type", tt.contentType)
 			if tt.acceptEncoding != "" {

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+
 	"github.com/CimaCha/go-url-shortener/internal/model"
 )
 
@@ -13,5 +14,5 @@ type URLStorage interface {
 	SaveShortURLBatch(ctx context.Context, URLRecords []*model.URLRecord, userID string) error
 	GetUserURLs(ctx context.Context, userID string) ([]*model.UserRecord, error)
 	GetShortURLData(ctx context.Context, shortURL string) (*model.StorageRecord, error)
-	DeleteURLsBatch(ctx context.Context, shortURLs []string) error
+	DeleteURLsBatch(ctx context.Context, shortURLs []string, userID string) error
 }

@@ -41,6 +41,20 @@ func (m *MockURLStorage) EXPECT() *MockURLStorageMockRecorder {
 	return m.recorder
 }
 
+// DeleteURLsBatch mocks base method.
+func (m *MockURLStorage) DeleteURLsBatch(ctx context.Context, shortURLs []string, userID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteURLsBatch", ctx, shortURLs, userID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteURLsBatch indicates an expected call of DeleteURLsBatch.
+func (mr *MockURLStorageMockRecorder) DeleteURLsBatch(ctx, shortURLs, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteURLsBatch", reflect.TypeOf((*MockURLStorage)(nil).DeleteURLsBatch), ctx, shortURLs, userID)
+}
+
 // FindFullURL mocks base method.
 func (m *MockURLStorage) FindFullURL(ctx context.Context, shortURL string) (string, error) {
 	m.ctrl.T.Helper()
@@ -54,6 +68,21 @@ func (m *MockURLStorage) FindFullURL(ctx context.Context, shortURL string) (stri
 func (mr *MockURLStorageMockRecorder) FindFullURL(ctx, shortURL any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindFullURL", reflect.TypeOf((*MockURLStorage)(nil).FindFullURL), ctx, shortURL)
+}
+
+// GetShortURLData mocks base method.
+func (m *MockURLStorage) GetShortURLData(ctx context.Context, shortURL string) (*model.StorageRecord, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetShortURLData", ctx, shortURL)
+	ret0, _ := ret[0].(*model.StorageRecord)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetShortURLData indicates an expected call of GetShortURLData.
+func (mr *MockURLStorageMockRecorder) GetShortURLData(ctx, shortURL any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetShortURLData", reflect.TypeOf((*MockURLStorage)(nil).GetShortURLData), ctx, shortURL)
 }
 
 // GetUserURLs mocks base method.

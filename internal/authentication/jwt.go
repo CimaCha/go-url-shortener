@@ -2,9 +2,9 @@ package authentication
 
 import (
 	"errors"
-	"fmt"
-	"github.com/golang-jwt/jwt/v4"
 	"time"
+
+	"github.com/golang-jwt/jwt/v4"
 )
 
 var (
@@ -55,22 +55,16 @@ func (b JWTBuilder) GetUserID(tokenString string) (string, error) {
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims,
 		func(t *jwt.Token) (interface{}, error) {
-			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+			if t.Method != jwt.SigningMethodHS256 {
+				return nil, ErrTokenIsInvalid
 			}
 			return b.SecretKey, nil
 		})
-	var validationError = jwt.ValidationError{}
-	if errors.As(err, &validationError) {
-		if validationError.Errors == jwt.ValidationErrorClaimsInvalid {
-			return "", ErrNoUserIDExists
-		}
-	}
-
-	if !token.Valid {
+	if err != nil || token == nil || !token.Valid {
 		return "", ErrTokenIsInvalid
 	}
-
-	fmt.Println("Token is valid")
+	if claims.UserID == "" {
+		return "", ErrNoUserIDExists
+	}
 	return claims.UserID, nil
 }

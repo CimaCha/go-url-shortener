@@ -3,6 +3,8 @@ package file
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"strconv"
 	"sync"
 
@@ -13,7 +15,7 @@ import (
 type Storage struct {
 	memory *repository.MemoryURLStorage
 	writer *Writer
-	mu     sync.Mutex
+	mu     sync.RWMutex
 }
 
 func NewFileStorage(filePath string) (*Storage, error) {
@@ -32,7 +34,7 @@ func NewFileStorage(filePath string) (*Storage, error) {
 
 	urls := make(map[string]repository.URLData, len(records))
 	for _, record := range records {
-		urls[record.ShortURL] = repository.URLData{UserID: record.UserID, OriginalURL: record.OriginalURL}
+		urls[record.ShortURL] = repository.URLData{UserID: record.UserID, OriginalURL: record.OriginalURL, DeletedFlag: record.DeletedFlag}
 	}
 	memory := repository.NewMemoryURLStorage(urls)
 
@@ -46,30 +48,21 @@ func (f *Storage) SaveShortURL(ctx context.Context, shortURL, fullURL, userID st
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	if storedShortURL, err := f.memory.SaveShortURL(ctx, shortURL, fullURL, userID); err != nil {
+	candidate := repository.NewMemoryURLStorage(f.memory.Snapshot())
+	if storedShortURL, err := candidate.SaveShortURL(ctx, shortURL, fullURL, userID); err != nil {
 		return storedShortURL, err
 	}
-
-	urls := f.memory.Snapshot()
-	records := make([]*model.FileRecord, 0, len(urls))
-	uuid := 0
-	for currentShortURL, userPair := range urls {
-		records = append(records, &model.FileRecord{
-			UUID:        strconv.Itoa(uuid),
-			ShortURL:    currentShortURL,
-			OriginalURL: userPair.OriginalURL,
-			UserID:      userPair.UserID,
-		})
-		uuid++
-	}
-
-	if err := f.writer.WriteRecords(records); err != nil {
+	if err := f.persist(candidate); err != nil {
 		return "", fmt.Errorf("persist short URL: %w", err)
 	}
+	f.memory = candidate
 	return "", nil
 }
 
 func (f *Storage) FindFullURL(ctx context.Context, shortURL string) (string, error) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
 	return f.memory.FindFullURL(ctx, shortURL)
 }
 
@@ -77,37 +70,59 @@ func (f *Storage) SaveShortURLBatch(ctx context.Context, URLRecords []*model.URL
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	if err := f.memory.SaveShortURLBatch(ctx, URLRecords, userID); err != nil {
+	candidate := repository.NewMemoryURLStorage(f.memory.Snapshot())
+	if err := candidate.SaveShortURLBatch(ctx, URLRecords, userID); err != nil {
 		return err
 	}
-
-	urls := f.memory.Snapshot()
-	records := make([]*model.FileRecord, 0, len(urls))
-	uuid := 0
-	for currentShortURL, userPair := range urls {
-		records = append(records, &model.FileRecord{
-			UUID:        strconv.Itoa(uuid),
-			ShortURL:    currentShortURL,
-			OriginalURL: userPair.OriginalURL,
-			UserID:      userPair.UserID,
-		})
-		uuid++
-	}
-
-	if err := f.writer.WriteRecords(records); err != nil {
+	if err := f.persist(candidate); err != nil {
 		return fmt.Errorf("persist short URL: %w", err)
 	}
+	f.memory = candidate
 	return nil
 }
 
 func (f *Storage) GetUserURLs(ctx context.Context, userID string) ([]*model.UserRecord, error) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
 	return f.memory.GetUserURLs(ctx, userID)
 }
 
 func (f *Storage) GetShortURLData(ctx context.Context, shortURL string) (*model.StorageRecord, error) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
 	return f.memory.GetShortURLData(ctx, shortURL)
 }
 
-func (f *Storage) DeleteURLsBatch(ctx context.Context, shortURLs []string) error {
-	return f.memory.DeleteURLsBatch(ctx, shortURLs)
+func (f *Storage) DeleteURLsBatch(ctx context.Context, shortURLs []string, userID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	candidate := repository.NewMemoryURLStorage(f.memory.Snapshot())
+	if err := candidate.DeleteURLsBatch(ctx, shortURLs, userID); err != nil {
+		return err
+	}
+	if err := f.persist(candidate); err != nil {
+		return fmt.Errorf("persist deleted URLs: %w", err)
+	}
+	f.memory = candidate
+	return nil
+}
+
+func (f *Storage) persist(memory *repository.MemoryURLStorage) error {
+	urls := memory.Snapshot()
+	shortURLs := slices.Sorted(maps.Keys(urls))
+	records := make([]*model.FileRecord, 0, len(urls))
+	for uuid, shortURL := range shortURLs {
+		data := urls[shortURL]
+		records = append(records, &model.FileRecord{
+			UUID:        strconv.Itoa(uuid),
+			ShortURL:    shortURL,
+			OriginalURL: data.OriginalURL,
+			UserID:      data.UserID,
+			DeletedFlag: data.DeletedFlag,
+		})
+	}
+	return f.writer.WriteRecords(records)
 }

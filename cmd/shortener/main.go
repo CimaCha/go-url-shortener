@@ -3,29 +3,25 @@ package main
 import (
 	"context"
 	"errors"
-	"github.com/CimaCha/go-url-shortener/internal/authentication"
-	apideletebatch "github.com/CimaCha/go-url-shortener/internal/handler/delete-url-batch"
-	userurls "github.com/CimaCha/go-url-shortener/internal/handler/get-api-user-urls"
-	apishortenbatch "github.com/CimaCha/go-url-shortener/internal/handler/post-api-shorten-batch"
-	"github.com/CimaCha/go-url-shortener/internal/repository"
-	databasestorage "github.com/CimaCha/go-url-shortener/internal/repository/database-storage"
-	"github.com/CimaCha/go-url-shortener/internal/repository/file"
 	"log"
 	"net/http"
 
+	"github.com/CimaCha/go-url-shortener/internal/authentication"
 	"github.com/CimaCha/go-url-shortener/internal/config"
+	apideletebatch "github.com/CimaCha/go-url-shortener/internal/handler/delete-url-batch"
+	userurls "github.com/CimaCha/go-url-shortener/internal/handler/get-api-user-urls"
 	"github.com/CimaCha/go-url-shortener/internal/handler/get-full-url"
 	getping "github.com/CimaCha/go-url-shortener/internal/handler/get-ping"
+	apishortenbatch "github.com/CimaCha/go-url-shortener/internal/handler/post-api-shorten-batch"
 	apishortenurl "github.com/CimaCha/go-url-shortener/internal/handler/post-api-shorten-url"
 	"github.com/CimaCha/go-url-shortener/internal/handler/post-shorten-url"
 	"github.com/CimaCha/go-url-shortener/internal/logger"
+	"github.com/CimaCha/go-url-shortener/internal/repository"
+	databasestorage "github.com/CimaCha/go-url-shortener/internal/repository/database-storage"
+	"github.com/CimaCha/go-url-shortener/internal/repository/file"
 	shortenerrouter "github.com/CimaCha/go-url-shortener/internal/router"
 	"github.com/CimaCha/go-url-shortener/internal/service"
 	"go.uber.org/zap"
-)
-
-const (
-	maxNumWorkers = 5
 )
 
 func main() {
@@ -77,7 +73,7 @@ func run(log zap.Logger) error {
 		storage = repository.NewMemoryURLStorage(make(map[string]repository.URLData))
 	}
 
-	urlService := service.NewService(storage, maxNumWorkers)
+	urlService := service.NewService(storage)
 
 	shortenURLHandler := shortenurl.NewShortenURLHandler(*log.With(zap.String("handler", "shorten URL")), urlService, cfg.BasicShortenAddress)
 	apiShortenURLHandler := apishortenurl.NewAPIShortenURLHandler(*log.With(zap.String("handler", "api shorten URL")), urlService, cfg.BasicShortenAddress)

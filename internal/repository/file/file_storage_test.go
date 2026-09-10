@@ -5,9 +5,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/CimaCha/go-url-shortener/internal/model"
@@ -158,7 +160,7 @@ func TestStorageSetShortURLWriteFailure(t *testing.T) {
 	tests := []struct {
 		name string
 	}{
-		{name: "write error keeps added record in memory"},
+		{name: "write error leaves memory unchanged"},
 	}
 
 	for _, tt := range tests {
@@ -167,6 +169,8 @@ func TestStorageSetShortURLWriteFailure(t *testing.T) {
 			root := t.TempDir()
 			filename := filepath.Join(root, "storage.json")
 			require.NoError(t, os.WriteFile(filename, nil, 0o600))
+			before, err := os.ReadFile(filename)
+			require.NoError(t, err)
 			storage, err := NewFileStorage(filename)
 			require.NoError(t, err)
 			storage.writer = NewWriter(filepath.Join(root, "missing", "storage.json"))
@@ -174,10 +178,85 @@ func TestStorageSetShortURLWriteFailure(t *testing.T) {
 			_, err = storage.SaveShortURL(ctx, "short", "https://example.com", "")
 
 			assert.ErrorIs(t, err, ErrOpenFileForWrite)
-			got, getErr := storage.FindFullURL(ctx, "short")
-			require.NoError(t, getErr)
-			assert.Equal(t, "https://example.com", got)
+			_, getErr := storage.FindFullURL(ctx, "short")
+			assert.ErrorIs(t, getErr, repository.ErrURLNotFound)
+			after, readErr := os.ReadFile(filename)
+			require.NoError(t, readErr)
+			assert.Equal(t, before, after)
 		})
+	}
+}
+
+func TestStorageWritesDeterministicSnapshot(t *testing.T) {
+	ctx := context.Background()
+	filename := filepath.Join(t.TempDir(), "storage.json")
+	require.NoError(t, os.WriteFile(filename, nil, 0o600))
+	storage, err := NewFileStorage(filename)
+	require.NoError(t, err)
+	_, err = storage.SaveShortURL(ctx, "z-short", "https://z.example.com", "user-id")
+	require.NoError(t, err)
+	_, err = storage.SaveShortURL(ctx, "a-short", "https://a.example.com", "user-id")
+	require.NoError(t, err)
+
+	snapshots := readSnapshots(t, filename)
+	require.Len(t, snapshots, 1)
+	require.Equal(t, []*model.FileRecord{
+		{UUID: "0", ShortURL: "a-short", OriginalURL: "https://a.example.com", UserID: "user-id"},
+		{UUID: "1", ShortURL: "z-short", OriginalURL: "https://z.example.com", UserID: "user-id"},
+	}, snapshots[0])
+}
+
+func TestStoragePersistsDeletion(t *testing.T) {
+	ctx := context.Background()
+	filename := filepath.Join(t.TempDir(), "storage.json")
+	require.NoError(t, os.WriteFile(filename, nil, 0o600))
+	storage, err := NewFileStorage(filename)
+	require.NoError(t, err)
+	_, err = storage.SaveShortURL(ctx, "short", "https://example.com", "user-id")
+	require.NoError(t, err)
+
+	require.NoError(t, storage.DeleteURLsBatch(ctx, []string{"short"}, "user-id"))
+	_, err = storage.FindFullURL(ctx, "short")
+	require.ErrorIs(t, err, repository.ErrURLHasGone)
+
+	reopened, err := NewFileStorage(filename)
+	require.NoError(t, err)
+	data, err := reopened.GetShortURLData(ctx, "short")
+	require.NoError(t, err)
+	require.Equal(t, &model.StorageRecord{UserID: "user-id", OriginalURL: "https://example.com", DeletedFlag: true}, data)
+	_, err = reopened.FindFullURL(ctx, "short")
+	require.ErrorIs(t, err, repository.ErrURLHasGone)
+}
+
+func TestStorageSupportsConcurrentMetadataReadsAndWrites(t *testing.T) {
+	ctx := context.Background()
+	filename := filepath.Join(t.TempDir(), "storage.json")
+	require.NoError(t, os.WriteFile(filename, nil, 0o600))
+	storage, err := NewFileStorage(filename)
+	require.NoError(t, err)
+	_, err = storage.SaveShortURL(ctx, "seed", "https://seed.example.com", "user-id")
+	require.NoError(t, err)
+
+	var wg sync.WaitGroup
+	errs := make(chan error, 40)
+	for i := range 20 {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			_, readErr := storage.GetShortURLData(ctx, "seed")
+			errs <- readErr
+		}()
+		i := i
+		go func() {
+			defer wg.Done()
+			_, writeErr := storage.SaveShortURL(ctx, fmt.Sprintf("short-%d", i), fmt.Sprintf("https://%d.example.com", i), "user-id")
+			errs <- writeErr
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for operationErr := range errs {
+		require.NoError(t, operationErr)
 	}
 }
 

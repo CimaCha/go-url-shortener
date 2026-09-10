@@ -3,12 +3,13 @@ package apideletebatch
 import (
 	"context"
 	"encoding/json"
-	"go.uber.org/zap"
 	"io"
 	"net/http"
+
+	"go.uber.org/zap"
 )
 
-//go:generate mockgen -source=handler.go -destination=mocks/mock_url_handler.gen.go -package=mocks
+//go:generate mockgen -source=handler.go -destination=mocks/mock_deleter.gen.go -package=mocks
 
 type Deleter interface {
 	DeleteBatch(ctx context.Context, shortURLBatch []string, userID string) error
@@ -43,8 +44,8 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, "empty body", http.StatusBadRequest)
 		return
 	}
-	err = h.service.DeleteBatch(req.Context(), decodedBody, req.Header.Get("userID"))
-	if err != nil {
+	userID := req.Header.Get("UserID")
+	if err := h.service.DeleteBatch(req.Context(), decodedBody, userID); err != nil {
 		h.log.Error("can't delete URL", zap.Error(err))
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return

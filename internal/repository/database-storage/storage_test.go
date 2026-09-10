@@ -93,6 +93,25 @@ func TestStorage(t *testing.T) {
 				require.ErrorIs(t, err, repository.ErrURLNotFound)
 			},
 		},
+		{
+			name: "deletes only URLs owned by user",
+			run: func(t *testing.T, ctx context.Context, storage *Storage) {
+				_, err := storage.SaveShortURL(ctx, "own", "https://example.com/own", "user-id")
+				require.NoError(t, err)
+				_, err = storage.SaveShortURL(ctx, "foreign", "https://example.com/foreign", "other-user")
+				require.NoError(t, err)
+
+				require.NoError(t, storage.DeleteURLsBatch(ctx, []string{"own", "foreign", "missing"}, "user-id"))
+				data, err := storage.GetShortURLData(ctx, "own")
+				require.NoError(t, err)
+				require.Equal(t, &model.StorageRecord{UserID: "user-id", OriginalURL: "https://example.com/own", DeletedFlag: true}, data)
+				_, err = storage.FindFullURL(ctx, "own")
+				require.ErrorIs(t, err, repository.ErrURLHasGone)
+				fullURL, err := storage.FindFullURL(ctx, "foreign")
+				require.NoError(t, err)
+				require.Equal(t, "https://example.com/foreign", fullURL)
+			},
+		},
 	}
 
 	for _, tt := range tests {

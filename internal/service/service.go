@@ -5,12 +5,16 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"sync"
+
 	"github.com/CimaCha/go-url-shortener/internal/model"
 	"github.com/CimaCha/go-url-shortener/internal/repository"
-	"sync"
 )
 
-const maxShortURLAttempts = 5
+const (
+	maxShortURLAttempts    = 5
+	deleteBatchConcurrency = 10
+)
 
 var (
 	ErrURLHasGone     = errors.New("URL was deleted")
@@ -24,23 +28,11 @@ var (
 )
 
 type Service struct {
-	storage    URLStorage
-	numWorkers int
+	storage URLStorage
 }
 
-type Result struct {
-	shortURL    string
-	userID      string
-	originalURL string
-	deletedFlag bool
-	err         error
-}
-
-func NewService(storage URLStorage, numWorkers int) Service {
-	return Service{
-		storage:    storage,
-		numWorkers: numWorkers,
-	}
+func NewService(storage URLStorage) Service {
+	return Service{storage: storage}
 }
 
 func (s Service) Shorten(ctx context.Context, fullURL string, userID string) (string, error) {
@@ -85,6 +77,11 @@ func (s Service) ShortenBatch(ctx context.Context, fullURLBatch []*model.Origina
 	if len(fullURLBatch) == 0 {
 		return nil, ErrEmptyURLList
 	}
+	for _, record := range fullURLBatch {
+		if record == nil || record.OriginalURL == "" {
+			return nil, ErrEmptyURL
+		}
+	}
 
 	for range maxShortURLAttempts {
 		URLRecords := make([]*model.URLRecord, 0, len(fullURLBatch))
@@ -126,143 +123,90 @@ func (s Service) GetUserURLs(ctx context.Context, userID string) ([]*model.UserR
 }
 
 func (s Service) DeleteBatch(ctx context.Context, shortURLList []string, userID string) error {
-	resultCh := make(chan Result)
-	doneCh := make(chan struct{})
+	if len(shortURLList) == 0 {
+		return ErrEmptyURLList
+	}
+
+	type lookupResult struct {
+		shortURL string
+		data     *model.StorageRecord
+		err      error
+	}
+
+	lookupCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	jobs := make(chan string)
+	results := make(chan lookupResult)
 	var wg sync.WaitGroup
-	resultArray := make([]string, 0)
+	workerCount := min(deleteBatchConcurrency, len(shortURLList))
+	wg.Add(workerCount)
 
-	// получаем канал с данными из генератора
-	inputChs := generator(shortURLList, doneCh)
-	fanOutChs := s.fanOut(ctx, doneCh, inputChs, s.numWorkers)
-	fanInCh := fanIn(doneCh, fanOutChs...)
-
-	for res := range fanInCh {
-		go func(res Result) {
-			wg.Add(1)
-			defer wg.Done()
-			if res.userID == userID && !res.deletedFlag {
-				resultCh <- res
-			}
-		}(res)
-	}
-
-	wg.Wait()
-
-	for res := range resultCh {
-		resultArray = append(resultArray, res.shortURL)
-	}
-
-	close(doneCh)
-
-	err := s.storage.DeleteURLsBatch(ctx, resultArray)
-	return err
-}
-
-func generator(shortURLsList []string, doneCh chan struct{}) chan string {
-	inputCh := make(chan string)
-
-	go func() {
-		defer close(inputCh)
-
-		for _, shortURL := range shortURLsList {
-			select {
-			case <-doneCh:
-				return
-			case inputCh <- shortURL:
-			}
-		}
-	}()
-
-	return inputCh
-}
-
-func (s Service) getShortURLData(ctx context.Context, doneCh chan struct{}, inputCh chan string) chan Result {
-	res := make(chan Result)
-
-	go func() {
-		defer close(res)
-
-		for data := range inputCh {
-			// замедлим вычисление, как будто функция add требует больше вычислительных ресурсов
-			shortURLData, err := s.storage.GetShortURLData(ctx, data)
-			result := Result{
-				shortURL:    data,
-				userID:      shortURLData.UserID,
-				originalURL: shortURLData.OriginalURL,
-				deletedFlag: shortURLData.DeletedFlag,
-				err:         err,
-			}
-
-			select {
-			case <-doneCh:
-				return
-			case res <- result:
-			}
-		}
-	}()
-	return res
-}
-
-func (s Service) fanOut(ctx context.Context, doneCh chan struct{}, inputCh chan string, numWorkers int) []chan Result {
-	channels := make([]chan Result, numWorkers)
-
-	for i := 0; i < numWorkers; i++ {
-		channels[i] = make(chan Result)
-		// получаем канал из горутины add
-		resultCh := s.getShortURLData(ctx, doneCh, inputCh)
-		// отправляем его в слайс каналов
-		channels[i] = resultCh
-	}
-
-	defer func() {
-		// Закрываем все каналы воркеров
-		for _, ch := range channels {
-			close(ch)
-		}
-	}()
-
-	return channels
-}
-
-func fanIn(doneCh chan struct{}, resultChs ...chan Result) chan Result {
-	// конечный выходной канал в который отправляем данные из всех каналов из слайса, назовём его результирующим
-	finalCh := make(chan Result)
-
-	// понадобится для ожидания всех горутин
-	var wg sync.WaitGroup
-
-	// перебираем все входящие каналы
-	for _, ch := range resultChs {
-		// в горутину передавать переменную цикла нельзя, поэтому делаем так
-		chClosure := ch
-
-		// инкрементируем счётчик горутин, которые нужно подождать
-		wg.Add(1)
-
+	for range workerCount {
 		go func() {
-			// откладываем сообщение о том, что горутина завершилась
 			defer wg.Done()
-
-			// получаем данные из канала
-			for data := range chClosure {
+			for shortURL := range jobs {
+				data, err := s.storage.GetShortURLData(lookupCtx, shortURL)
 				select {
-				// выходим из горутины, если канал закрылся
-				case <-doneCh:
+				case results <- lookupResult{shortURL: shortURL, data: data, err: err}:
+				case <-lookupCtx.Done():
 					return
-				// если не закрылся, отправляем данные в конечный выходной канал
-				case finalCh <- data:
 				}
 			}
 		}()
 	}
 
 	go func() {
-		// ждём завершения всех горутин
-		wg.Wait()
-		// когда все горутины завершились, закрываем результирующий канал
-		close(finalCh)
+		defer close(jobs)
+		for _, shortURL := range shortURLList {
+			select {
+			case jobs <- shortURL:
+			case <-lookupCtx.Done():
+				return
+			}
+		}
 	}()
 
-	// возвращаем результирующий канал
-	return finalCh
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	ownedURLs := make([]string, 0, len(shortURLList))
+	var lookupErr error
+	for result := range results {
+		if result.err != nil {
+			if errors.Is(result.err, repository.ErrURLNotFound) {
+				continue
+			}
+			if lookupErr == nil {
+				lookupErr = result.err
+				cancel()
+			}
+			continue
+		}
+		if result.data == nil {
+			if lookupErr == nil {
+				lookupErr = errors.New("storage returned nil URL data")
+				cancel()
+			}
+			continue
+		}
+		if result.data.UserID == userID && !result.data.DeletedFlag {
+			ownedURLs = append(ownedURLs, result.shortURL)
+		}
+	}
+
+	if lookupErr != nil {
+		return fmt.Errorf("%w: get short URL data: %w", ErrRepository, lookupErr)
+	}
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("%w: get short URL data: %w", ErrRepository, err)
+	}
+	if len(ownedURLs) == 0 {
+		return nil
+	}
+	if err := s.storage.DeleteURLsBatch(ctx, ownedURLs, userID); err != nil {
+		return fmt.Errorf("%w: delete URLs: %w", ErrRepository, err)
+	}
+	return nil
 }

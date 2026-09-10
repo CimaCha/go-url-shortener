@@ -111,6 +111,45 @@ func TestMemoryURLStorageBatchCollisionIsAtomic(t *testing.T) {
 	assert.Equal(t, map[string]URLData{
 		"existing": {OriginalURL: "https://example.com/existing"},
 	}, storage.Snapshot())
+	userURLs, getErr := storage.GetUserURLs(ctx, "")
+	assert.NoError(t, getErr)
+	assert.Equal(t, []*model.UserRecord{{ShortURL: "existing", OriginalURL: "https://example.com/existing"}}, userURLs)
+}
+
+func TestMemoryURLStorageDeletesOnlyOwnedURLs(t *testing.T) {
+	ctx := context.Background()
+	storage := NewMemoryURLStorage(map[string]URLData{
+		"own":     {UserID: "user-id", OriginalURL: "https://example.com/own"},
+		"foreign": {UserID: "other-user", OriginalURL: "https://example.com/foreign"},
+	})
+
+	err := storage.DeleteURLsBatch(ctx, []string{"own", "foreign", "missing"}, "user-id")
+
+	assert.NoError(t, err)
+	_, err = storage.FindFullURL(ctx, "own")
+	assert.ErrorIs(t, err, ErrURLHasGone)
+	got, err := storage.FindFullURL(ctx, "foreign")
+	assert.NoError(t, err)
+	assert.Equal(t, "https://example.com/foreign", got)
+	assert.NotContains(t, storage.Snapshot(), "missing")
+}
+
+func TestMemoryURLStorageGetShortURLData(t *testing.T) {
+	ctx := context.Background()
+	storage := NewMemoryURLStorage(map[string]URLData{
+		"active":  {UserID: "user-id", OriginalURL: "https://example.com/active"},
+		"deleted": {UserID: "user-id", OriginalURL: "https://example.com/deleted", DeletedFlag: true},
+	})
+
+	active, err := storage.GetShortURLData(ctx, "active")
+	assert.NoError(t, err)
+	assert.Equal(t, &model.StorageRecord{UserID: "user-id", OriginalURL: "https://example.com/active"}, active)
+	deleted, err := storage.GetShortURLData(ctx, "deleted")
+	assert.NoError(t, err)
+	assert.Equal(t, &model.StorageRecord{UserID: "user-id", OriginalURL: "https://example.com/deleted", DeletedFlag: true}, deleted)
+	missing, err := storage.GetShortURLData(ctx, "missing")
+	assert.ErrorIs(t, err, ErrURLNotFound)
+	assert.Nil(t, missing)
 }
 
 func TestMemoryURLStorageBatchRejectsInternalDuplicate(t *testing.T) {

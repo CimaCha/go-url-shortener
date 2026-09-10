@@ -9,7 +9,7 @@ type ShortenURLResponse struct {
 }
 
 type StorageRecord struct {
-	UserID      string `json:"user_id,omitempty"`
-	OriginalURL string `json:"original_url,omitempty"`
-	DeletedFlag bool   `json:"deleted_flag,omitempty"`
+	UserID      string
+	OriginalURL string
+	DeletedFlag bool
 }

@@ -82,6 +82,18 @@ func TestAPIShortenBatchHandler(t *testing.T) {
 			wantContentType: "text/plain; charset=utf-8",
 		},
 		{
+			name: "empty URL in batch",
+			body: `[{"correlation_id":"first","original_url":""}]`,
+			setup: func(urlService *mocks.MockShortener, ctx context.Context) {
+				urlService.EXPECT().ShortenBatch(ctx, []*model.OriginalURLRecord{
+					{CorrelationID: "first"},
+				}, "user-id").Return(nil, service.ErrEmptyURL)
+			},
+			wantStatus:      http.StatusBadRequest,
+			wantBody:        "empty URL\n",
+			wantContentType: "text/plain; charset=utf-8",
+		},
+		{
 			name:            "body read error",
 			readError:       true,
 			wantStatus:      http.StatusInternalServerError,
