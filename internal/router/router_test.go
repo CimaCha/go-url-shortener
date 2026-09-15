@@ -72,7 +72,7 @@ func TestRouter(t *testing.T) {
 				gotHandler = "delete-urls"
 				res.WriteHeader(http.StatusAccepted)
 			})
-			router := New(zap.NewNop(), authentication.JWTBuilder{SecretKey: []byte("test-secret")}, authentication.NewUserIdParser([]byte("test-secret")), shortenURLHandler, apiShortenURLHandler, getFullURLHandler, pingHandler, apiShortenBatchHandler, userURLsHandler, deleteURLsHandler)
+			router := New(zap.NewNop(), authentication.JWTBuilder{SecretKey: []byte("test-secret")}, authentication.NewUserIDParser([]byte("test-secret")), shortenURLHandler, apiShortenURLHandler, getFullURLHandler, pingHandler, apiShortenBatchHandler, userURLsHandler, deleteURLsHandler)
 			request := httptest.NewRequest(tt.method, tt.path, strings.NewReader("https://example.com"))
 			request.Header.Set("Content-Type", tt.contentType)
 			response := httptest.NewRecorder()
@@ -224,7 +224,7 @@ func TestRouterGzipMiddleware(t *testing.T) {
 				gotHandler = "full"
 				writer.WriteHeader(http.StatusTemporaryRedirect)
 			})
-			router := New(zap.NewNop(), authentication.JWTBuilder{SecretKey: []byte("test-secret")}, authentication.NewUserIdParser([]byte("test-secret")), shortenURLHandler, apiShortenURLHandler, getFullURLHandler, http.NotFoundHandler(), http.NotFoundHandler(), http.NotFoundHandler(), http.NotFoundHandler())
+			router := New(zap.NewNop(), authentication.JWTBuilder{SecretKey: []byte("test-secret")}, authentication.NewUserIDParser([]byte("test-secret")), shortenURLHandler, apiShortenURLHandler, getFullURLHandler, http.NotFoundHandler(), http.NotFoundHandler(), http.NotFoundHandler(), http.NotFoundHandler())
 			request := httptest.NewRequest(http.MethodPost, tt.path, bytes.NewReader(tt.body(t)))
 			request.Header.Set("Content-Type", tt.contentType)
 			if tt.acceptEncoding != "" {

@@ -12,7 +12,7 @@ type Parser struct {
 	SecretKey []byte
 }
 
-func NewUserIdParser(secretKey []byte) *Parser {
+func NewUserIDParser(secretKey []byte) *Parser {
 	return &Parser{
 		SecretKey: secretKey,
 	}

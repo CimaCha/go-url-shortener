@@ -118,7 +118,8 @@ func TestAuthMiddlewareHandlesBuilderError(t *testing.T) {
 
 func TestGetUserID(t *testing.T) {
 	require.Empty(t, getUserID(context.Background()))
-	ctx := context.WithValue(context.Background(), "UserID", "forged-user")
+	type unrelatedContextKey string
+	ctx := context.WithValue(context.Background(), unrelatedContextKey("UserID"), "forged-user")
 	require.Empty(t, getUserID(ctx))
 	ctx = context.WithValue(ctx, contextKey{}, "user-id")
 	require.Equal(t, "user-id", getUserID(ctx))

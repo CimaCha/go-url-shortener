@@ -25,7 +25,7 @@ func UserID(ctx context.Context) string {
 	return getUserID(ctx)
 }
 
-func AuthMiddleware(log *zap.Logger, jwtBuilder TokenBuilder, userIdParser UserIDParser) func(http.Handler) http.Handler {
+func AuthMiddleware(log *zap.Logger, jwtBuilder TokenBuilder, userIDParser UserIDParser) func(http.Handler) http.Handler {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			jwtCookie, err := request.Cookie("jwt")
@@ -64,7 +64,7 @@ func AuthMiddleware(log *zap.Logger, jwtBuilder TokenBuilder, userIdParser UserI
 				return
 			}
 
-			userID, err := userIdParser.GetUserID(jwtCookie.Value)
+			userID, err := userIDParser.GetUserID(jwtCookie.Value)
 			if err != nil {
 				http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 				return

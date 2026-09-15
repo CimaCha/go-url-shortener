@@ -86,7 +86,7 @@ func run(log zap.Logger) error {
 	defer deleteURLsHandler.Close()
 
 	jwtBuilder := authentication.NewJWTBuilder([]byte(cfg.SecretKey))
-	userIDParser := authentication.NewUserIdParser([]byte(cfg.SecretKey))
+	userIDParser := authentication.NewUserIDParser([]byte(cfg.SecretKey))
 
 	router := shortenerrouter.New(
 		log.With(zap.String("layer", "router")),

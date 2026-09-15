@@ -11,7 +11,7 @@ import (
 
 func TestParser(t *testing.T) {
 	builder := NewJWTBuilder([]byte("secret"))
-	parser := NewUserIdParser([]byte("secret"))
+	parser := NewUserIDParser([]byte("secret"))
 
 	t.Run("round trip", func(t *testing.T) {
 		token, err := builder.BuildJWTString("user-id", time.Hour)
