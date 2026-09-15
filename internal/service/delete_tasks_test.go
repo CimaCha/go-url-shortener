@@ -112,12 +112,13 @@ func TestProcessDeleteTasksFlush(t *testing.T) {
 
 func TestProcessDeleteTasksGroupsUsersAndContinuesAfterError(t *testing.T) {
 	storage := mocks.NewMockURLStorage(gomock.NewController(t))
-	ctx := context.WithValue(context.Background(), struct{}{}, "request-value")
+	type requestValueKey struct{}
+	ctx := context.WithValue(context.Background(), requestValueKey{}, "request-value")
 	storage.EXPECT().GetShortURLData(gomock.Any(), "a").Return(&model.StorageRecord{UserID: "alice"}, nil)
 	storage.EXPECT().GetShortURLData(gomock.Any(), "b").Return(&model.StorageRecord{UserID: "bob"}, nil)
 	storage.EXPECT().DeleteURLsBatch(gomock.Any(), []string{"a"}, "alice").Return(errStorage)
 	storage.EXPECT().DeleteURLsBatch(gomock.Any(), []string{"b"}, "bob").DoAndReturn(func(got context.Context, urls []string, id string) error {
-		require.Equal(t, "request-value", got.Value(struct{}{}))
+		require.Equal(t, "request-value", got.Value(requestValueKey{}))
 		return nil
 	})
 	jobs := make(chan DeleteTask, 2)
