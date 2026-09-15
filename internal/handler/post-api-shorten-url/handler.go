@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/CimaCha/go-url-shortener/internal/authentication"
 	"github.com/CimaCha/go-url-shortener/internal/model"
 	"github.com/CimaCha/go-url-shortener/internal/service"
 	"go.uber.org/zap"
@@ -45,7 +46,7 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, err.Error(), http.StatusBadRequest)
 		return
 	}
-	url, err := h.service.Shorten(req.Context(), decodedBody.URL, req.Header.Get("userID"))
+	url, err := h.service.Shorten(req.Context(), decodedBody.URL, authentication.UserID(req.Context()))
 	if err != nil {
 		if errors.Is(err, service.ErrFullURLExists) {
 			var encodedBody model.ShortenURLResponse

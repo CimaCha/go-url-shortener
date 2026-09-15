@@ -15,7 +15,7 @@ import (
 type Storage struct {
 	memory *repository.MemoryURLStorage
 	writer *Writer
-	mu     sync.RWMutex
+	mu     sync.Mutex
 }
 
 func NewFileStorage(filePath string) (*Storage, error) {
@@ -60,8 +60,8 @@ func (f *Storage) SaveShortURL(ctx context.Context, shortURL, fullURL, userID st
 }
 
 func (f *Storage) FindFullURL(ctx context.Context, shortURL string) (string, error) {
-	f.mu.RLock()
-	defer f.mu.RUnlock()
+	f.mu.Lock()
+	defer f.mu.Unlock()
 
 	return f.memory.FindFullURL(ctx, shortURL)
 }
@@ -82,15 +82,15 @@ func (f *Storage) SaveShortURLBatch(ctx context.Context, URLRecords []*model.URL
 }
 
 func (f *Storage) GetUserURLs(ctx context.Context, userID string) ([]*model.UserRecord, error) {
-	f.mu.RLock()
-	defer f.mu.RUnlock()
+	f.mu.Lock()
+	defer f.mu.Unlock()
 
 	return f.memory.GetUserURLs(ctx, userID)
 }
 
 func (f *Storage) GetShortURLData(ctx context.Context, shortURL string) (*model.StorageRecord, error) {
-	f.mu.RLock()
-	defer f.mu.RUnlock()
+	f.mu.Lock()
+	defer f.mu.Unlock()
 
 	return f.memory.GetShortURLData(ctx, shortURL)
 }

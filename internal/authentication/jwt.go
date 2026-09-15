@@ -12,6 +12,12 @@ var (
 	ErrNoUserIDExists = errors.New("user id is not exists in token claims")
 )
 
+//go:generate mockgen -source=jwt.go -destination=mocks/mock_jwt.gen.go -package=mocks
+
+type TokenBuilder interface {
+	BuildJWTString(userID string, tokenExp time.Duration) (string, error)
+}
+
 type JWTBuilder struct {
 	SecretKey []byte
 }
@@ -49,22 +55,4 @@ func (b JWTBuilder) BuildJWTString(userID string, tokenExp time.Duration) (strin
 
 	// возвращаем строку токена
 	return tokenString, nil
-}
-
-func (b JWTBuilder) GetUserID(tokenString string) (string, error) {
-	claims := &Claims{}
-	token, err := jwt.ParseWithClaims(tokenString, claims,
-		func(t *jwt.Token) (interface{}, error) {
-			if t.Method != jwt.SigningMethodHS256 {
-				return nil, ErrTokenIsInvalid
-			}
-			return b.SecretKey, nil
-		})
-	if err != nil || token == nil || !token.Valid {
-		return "", ErrTokenIsInvalid
-	}
-	if claims.UserID == "" {
-		return "", ErrNoUserIDExists
-	}
-	return claims.UserID, nil
 }

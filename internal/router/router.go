@@ -11,11 +11,11 @@ import (
 	"go.uber.org/zap"
 )
 
-func New(log *zap.Logger, jwtBuilder authentication.JWTBuilder, shortenURLHandler, apiShortenURLHandler, getFullURLHandler, pingHandler, apiShortenBatchHandler, userURLsHandler, deleteURLsHandler http.Handler) http.Handler {
+func New(log *zap.Logger, jwtBuilder authentication.TokenBuilder, userIDParser authentication.UserIDParser, shortenURLHandler, apiShortenURLHandler, getFullURLHandler, pingHandler, apiShortenBatchHandler, userURLsHandler, deleteURLsHandler http.Handler) http.Handler {
 	router := chi.NewRouter()
 	router.Use(logger.RequestLogger(log))
 	router.Use(compression.GzipMiddleware(log))
-	router.Use(authentication.AuthMiddleware(log, jwtBuilder))
+	router.Use(authentication.AuthMiddleware(log, jwtBuilder, userIDParser))
 	router.With(middleware.AllowContentType("text/plain")).
 		Method(http.MethodPost, "/", shortenURLHandler)
 	router.With(middleware.AllowContentType("application/json")).

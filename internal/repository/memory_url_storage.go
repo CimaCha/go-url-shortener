@@ -18,7 +18,7 @@ var (
 )
 
 type MemoryURLStorage struct {
-	mu           sync.RWMutex
+	mu           sync.Mutex
 	urls         map[string]URLData
 	backwardUrls map[string]string
 	userMap      map[string][]*model.UserRecord
@@ -64,8 +64,8 @@ func (s *MemoryURLStorage) SaveShortURL(_ context.Context, shortURL, fullURL, us
 }
 
 func (s *MemoryURLStorage) FindFullURL(_ context.Context, shortURL string) (string, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	fullURLData, ok := s.urls[shortURL]
 	if !ok {
@@ -79,8 +79,8 @@ func (s *MemoryURLStorage) FindFullURL(_ context.Context, shortURL string) (stri
 }
 
 func (s *MemoryURLStorage) Snapshot() map[string]URLData {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	return maps.Clone(s.urls)
 }
@@ -112,8 +112,8 @@ func (s *MemoryURLStorage) SaveShortURLBatch(_ context.Context, URLRecords []*mo
 }
 
 func (s *MemoryURLStorage) GetUserURLs(_ context.Context, userID string) ([]*model.UserRecord, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	pairs, ok := s.userMap[userID]
 	if !ok {
 		return nil, ErrUserNotFound
@@ -122,8 +122,8 @@ func (s *MemoryURLStorage) GetUserURLs(_ context.Context, userID string) ([]*mod
 }
 
 func (s *MemoryURLStorage) GetShortURLData(_ context.Context, shortURL string) (*model.StorageRecord, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	data, ok := s.urls[shortURL]
 	if !ok {

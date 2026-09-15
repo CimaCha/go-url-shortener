@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/CimaCha/go-url-shortener/internal/authentication"
 	"github.com/CimaCha/go-url-shortener/internal/config"
@@ -73,20 +74,24 @@ func run(log zap.Logger) error {
 		storage = repository.NewMemoryURLStorage(make(map[string]repository.URLData))
 	}
 
-	urlService := service.NewService(storage)
+	urlService := service.NewService(storage, cfg.MaxShortURLsAttempts, cfg.DeleteBatchConcurrency)
+	defer urlService.Close()
 
 	shortenURLHandler := shortenurl.NewShortenURLHandler(*log.With(zap.String("handler", "shorten URL")), urlService, cfg.BasicShortenAddress)
 	apiShortenURLHandler := apishortenurl.NewAPIShortenURLHandler(*log.With(zap.String("handler", "api shorten URL")), urlService, cfg.BasicShortenAddress)
 	getFullURLHandler := fullurl.NewGetFullURLHandler(*log.With(zap.String("handler", "get full URL")), urlService)
 	apiShortenBatchHandler := apishortenbatch.NewAPIShortenBatchHandler(*log.With(zap.String("handler", "api shorten batch")), urlService, cfg.BasicShortenAddress)
 	userURLsHandler := userurls.NewHandler(*log.With(zap.String("handler", "get user URLs")), urlService, cfg.BasicShortenAddress)
-	deleteURLsHandler := apideletebatch.NewAPIDeleteBatchHandler(*log.With(zap.String("handler", "delete URLs")), urlService)
+	deleteURLsHandler := apideletebatch.NewAPIDeleteBatchHandler(*log.With(zap.String("handler", "delete URLs")), urlService, cfg.DeleteBatchSize, time.Duration(cfg.DeletionTimeout)*time.Second)
+	defer deleteURLsHandler.Close()
 
 	jwtBuilder := authentication.NewJWTBuilder([]byte(cfg.SecretKey))
+	userIDParser := authentication.NewUserIdParser([]byte(cfg.SecretKey))
 
 	router := shortenerrouter.New(
 		log.With(zap.String("layer", "router")),
-		*jwtBuilder,
+		jwtBuilder,
+		userIDParser,
 		shortenURLHandler,
 		apiShortenURLHandler,
 		getFullURLHandler,

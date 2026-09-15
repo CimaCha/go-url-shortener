@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/CimaCha/go-url-shortener/internal/authentication"
 	"io"
 	"net/http"
 
@@ -46,7 +47,7 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, err.Error(), http.StatusBadRequest)
 		return
 	}
-	shortURLs, err := h.service.ShortenBatch(req.Context(), decodedBody, req.Header.Get("userID"))
+	shortURLs, err := h.service.ShortenBatch(req.Context(), decodedBody, authentication.UserID(req.Context()))
 	if err != nil {
 		if errors.Is(err, service.ErrEmptyURLList) || errors.Is(err, service.ErrEmptyURL) {
 			http.Error(res, err.Error(), http.StatusBadRequest)

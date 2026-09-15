@@ -2,6 +2,7 @@ package config
 
 import (
 	"flag"
+	"github.com/stretchr/testify/require"
 	"io"
 	"os"
 	"testing"
@@ -35,9 +36,7 @@ func TestNew(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			flag.CommandLine = flag.NewFlagSet(t.Name(), flag.ContinueOnError)
-			flag.CommandLine.SetOutput(io.Discard)
-			os.Args = append([]string{"shortener"}, tt.args...)
+			isolateConfig(t, tt.args)
 			t.Setenv("SERVER_ADDRESS", tt.envAddress)
 			t.Setenv("BASE_URL", tt.envBaseURL)
 			t.Setenv("FILE_STORAGE_PATH", tt.envFilePath)
@@ -65,4 +64,71 @@ func TestNew(t *testing.T) {
 			}
 		})
 	}
+}
+
+func isolateConfig(t *testing.T, args []string) {
+	t.Helper()
+	originalFlags, originalArgs := flag.CommandLine, os.Args
+	t.Cleanup(func() { flag.CommandLine, os.Args = originalFlags, originalArgs })
+	flag.CommandLine = flag.NewFlagSet(t.Name(), flag.ContinueOnError)
+	flag.CommandLine.SetOutput(io.Discard)
+	os.Args = append([]string{"shortener"}, args...)
+	for _, name := range []string{"SERVER_ADDRESS", "BASE_URL", "FILE_STORAGE_PATH", "DATABASE_DSN", "SECRET_KEY", "MAX_SHORTEN_ATTEMPTS", "DELETE_BATCH_CONCURRENCY", "DELETE_BATCH_SIZE", "DELETION_TIMEOUT"} {
+		t.Setenv(name, "")
+	}
+}
+
+func TestNumericConfig(t *testing.T) {
+	for _, field := range []struct {
+		flag, env    string
+		get          func(*Config) int
+		defaultValue int
+	}{
+		{"-m", "MAX_SHORTEN_ATTEMPTS", func(c *Config) int { return c.MaxShortURLsAttempts }, 5},
+		{"-c", "DELETE_BATCH_CONCURRENCY", func(c *Config) int { return c.DeleteBatchConcurrency }, 10},
+		{"-db", "DELETE_BATCH_SIZE", func(c *Config) int { return c.DeleteBatchSize }, 100},
+		{"-dt", "DELETION_TIMEOUT", func(c *Config) int { return c.DeletionTimeout }, 10},
+	} {
+		t.Run(field.env, func(t *testing.T) {
+			t.Run("default", func(t *testing.T) {
+				isolateConfig(t, nil)
+				cfg, err := New()
+				require.NoError(t, err)
+				require.Equal(t, field.defaultValue, field.get(cfg))
+			})
+			t.Run("flag", func(t *testing.T) {
+				isolateConfig(t, []string{field.flag, "3"})
+				cfg, err := New()
+				require.NoError(t, err)
+				require.Equal(t, 3, field.get(cfg))
+			})
+			t.Run("environment overrides flag", func(t *testing.T) {
+				isolateConfig(t, []string{field.flag, "3"})
+				t.Setenv(field.env, "7")
+				cfg, err := New()
+				require.NoError(t, err)
+				require.Equal(t, 7, field.get(cfg))
+			})
+			for _, value := range []string{"0", "-1", "invalid", "999999999999999999999999"} {
+				t.Run("invalid environment "+value, func(t *testing.T) {
+					isolateConfig(t, nil)
+					t.Setenv(field.env, value)
+					_, err := New()
+					require.Error(t, err)
+				})
+			}
+			for _, value := range []string{"0", "-1", "invalid", "999999999999999999999999"} {
+				t.Run("invalid flag "+value, func(t *testing.T) {
+					isolateConfig(t, []string{field.flag, value})
+					_, err := New()
+					require.Error(t, err)
+				})
+			}
+		})
+	}
+	t.Run("duration overflow", func(t *testing.T) {
+		isolateConfig(t, []string{"-dt", "9223372037"})
+		_, err := New()
+		require.Error(t, err)
+	})
 }

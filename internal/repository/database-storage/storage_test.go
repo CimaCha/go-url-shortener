@@ -11,6 +11,7 @@ import (
 	"github.com/CimaCha/go-url-shortener/internal/model"
 	"github.com/CimaCha/go-url-shortener/internal/repository"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
 )
@@ -37,6 +38,35 @@ func TestStorage(t *testing.T) {
 				fullURL, err := storage.FindFullURL(ctx, "short")
 				require.NoError(t, err)
 				require.Equal(t, "https://example.com", fullURL)
+			},
+		},
+		{
+			name: "saves multiple URLs and a batch for one user",
+			run: func(t *testing.T, ctx context.Context, storage *Storage) {
+				for _, id := range []string{"first", "second"} {
+					_, err := storage.SaveShortURL(ctx, id, "https://example.com/"+id, "user")
+					require.NoError(t, err)
+				}
+				require.NoError(t, storage.SaveShortURLBatch(ctx, []*model.URLRecord{
+					{ShortURL: "third", OriginalURL: "https://example.com/third"},
+					{ShortURL: "fourth", OriginalURL: "https://example.com/fourth"},
+				}, "user"))
+				urls, err := storage.GetUserURLs(ctx, "user")
+				require.NoError(t, err)
+				require.Len(t, urls, 4)
+			},
+		},
+		{
+			name: "preserves other unique constraint errors",
+			run: func(t *testing.T, ctx context.Context, storage *Storage) {
+				_, err := storage.Pool.Exec(ctx, "CREATE UNIQUE INDEX test_user_unique ON urls(user_id)")
+				require.NoError(t, err)
+				_, err = storage.SaveShortURL(ctx, "first", "https://example.com/first", "user")
+				require.NoError(t, err)
+				_, err = storage.SaveShortURL(ctx, "second", "https://example.com/second", "user")
+				var pgErr *pgconn.PgError
+				require.ErrorAs(t, err, &pgErr)
+				require.Equal(t, "test_user_unique", pgErr.ConstraintName)
 			},
 		},
 		{
@@ -153,4 +183,15 @@ func newTestDSN(t *testing.T) string {
 	query.Set("search_path", schema)
 	databaseURL.RawQuery = query.Encode()
 	return databaseURL.String()
+}
+
+func TestSaveShortURLPreservesCanceledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	pool, err := pgxpool.New(ctx, "postgres://test:test@127.0.0.1:1/test?sslmode=disable")
+	require.NoError(t, err)
+	defer pool.Close()
+	stored, err := (Storage{Pool: pool}).SaveShortURL(ctx, "short", "https://example.com", "user")
+	require.ErrorIs(t, err, context.Canceled)
+	require.Empty(t, stored)
 }

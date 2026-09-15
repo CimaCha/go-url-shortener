@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/CimaCha/go-url-shortener/internal/authentication"
 	"go.uber.org/zap"
 	"io"
 	"net/http"
@@ -39,7 +40,7 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	url, err := h.service.Shorten(req.Context(), string(body), req.Header.Get("userID"))
+	url, err := h.service.Shorten(req.Context(), string(body), authentication.UserID(req.Context()))
 	if err != nil {
 		if errors.Is(err, service.ErrFullURLExists) {
 			finalURL := fmt.Sprintf("%s/%s", h.defaultShortAddress, url)

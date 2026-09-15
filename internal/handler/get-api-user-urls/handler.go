@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/CimaCha/go-url-shortener/internal/authentication"
 	"github.com/CimaCha/go-url-shortener/internal/model"
 	"github.com/CimaCha/go-url-shortener/internal/service"
 	"go.uber.org/zap"
@@ -29,7 +30,7 @@ type Handler struct {
 
 func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
-	userID := req.Header.Get("userID")
+	userID := authentication.UserID(req.Context())
 
 	userURLsList, err := h.service.GetUserURLs(req.Context(), userID)
 	if err != nil {

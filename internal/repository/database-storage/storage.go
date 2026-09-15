@@ -49,6 +49,9 @@ func (s Storage) SaveShortURL(ctx context.Context, shortURL, fullURL, userID str
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 		return "", repository.ErrShortURLExists
 	}
+	if err != nil {
+		return "", err
+	}
 	if storedFullURL != shortURL {
 		return storedFullURL, repository.ErrFullURLExists
 	}
@@ -119,9 +122,6 @@ func (s Storage) SaveShortURLBatch(ctx context.Context, URLRecords []*model.URLR
 func (s Storage) GetUserURLs(ctx context.Context, userID string) ([]*model.UserRecord, error) {
 	var userRecords []*model.UserRecord
 	rows, err := s.Pool.Query(ctx, "SELECT full_url, short_url FROM urls WHERE user_id = $1", userID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, repository.ErrUserNotFound
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -135,6 +135,9 @@ func (s Storage) GetUserURLs(ctx context.Context, userID string) ([]*model.UserR
 		}
 
 		userRecords = append(userRecords, &userRecord)
+	}
+	if rows.Err() != nil {
+		return nil, rows.Err()
 	}
 	return userRecords, nil
 }

@@ -5,26 +5,39 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"time"
 
+	"github.com/CimaCha/go-url-shortener/internal/authentication"
+	"github.com/CimaCha/go-url-shortener/internal/service"
 	"go.uber.org/zap"
 )
 
 //go:generate mockgen -source=handler.go -destination=mocks/mock_deleter.gen.go -package=mocks
 
 type Deleter interface {
-	DeleteBatch(ctx context.Context, shortURLBatch []string, userID string) error
+	ProcessDeleteTasks(onError func(error), batchSize int, timeout time.Duration, inputs ...<-chan service.DeleteTask)
 }
 
 type Handler struct {
-	log     zap.Logger
-	service Deleter
+	log  zap.Logger
+	jobs chan service.DeleteTask
+	done chan struct{}
 }
 
-func NewAPIDeleteBatchHandler(log zap.Logger, service Deleter) Handler {
-	return Handler{
-		log:     log,
-		service: service,
-	}
+func NewAPIDeleteBatchHandler(log zap.Logger, deleter Deleter, batchSize int, timeout time.Duration) Handler {
+	h := Handler{log: log, jobs: make(chan service.DeleteTask, 100), done: make(chan struct{})}
+	go func() {
+		defer close(h.done)
+		deleter.ProcessDeleteTasks(func(err error) {
+			h.log.Error("can't delete URL", zap.Error(err))
+		}, batchSize, timeout, h.jobs)
+	}()
+	return h
+}
+
+func (h Handler) Close() {
+	close(h.jobs)
+	<-h.done
 }
 
 func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
@@ -44,12 +57,15 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, "empty body", http.StatusBadRequest)
 		return
 	}
-	userID := req.Header.Get("UserID")
-	if err := h.service.DeleteBatch(req.Context(), decodedBody, userID); err != nil {
-		h.log.Error("can't delete URL", zap.Error(err))
-		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
+	task := service.DeleteTask{
+		Context: context.WithoutCancel(req.Context()),
+		URLs:    decodedBody,
+		UserID:  authentication.UserID(req.Context()),
 	}
-
-	res.WriteHeader(http.StatusAccepted)
+	select {
+	case h.jobs <- task:
+		res.WriteHeader(http.StatusAccepted)
+	default:
+		http.Error(res, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+	}
 }

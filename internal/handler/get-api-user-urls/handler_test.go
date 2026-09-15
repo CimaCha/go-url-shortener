@@ -2,6 +2,8 @@ package userurls
 
 import (
 	"errors"
+	"github.com/CimaCha/go-url-shortener/internal/authentication"
+	authmocks "github.com/CimaCha/go-url-shortener/internal/authentication/mocks"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -42,7 +44,14 @@ func TestHandler(t *testing.T) {
 			controller := gomock.NewController(t)
 			urlService := mocks.NewMockUserURLsGetter(controller)
 			request := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil)
-			request.Header.Set("userID", "user-id")
+			request.Header.Set("userID", "forged-user")
+			request.AddCookie(&http.Cookie{Name: "jwt", Value: "test-token"})
+			parser := authmocks.NewMockUserIDParser(controller)
+			parser.EXPECT().GetUserID("test-token").Return("user-id", nil)
+			builder := authmocks.NewMockTokenBuilder(controller)
+			authentication.AuthMiddleware(zap.NewNop(), builder, parser)(http.HandlerFunc(func(_ http.ResponseWriter, authenticated *http.Request) {
+				request = authenticated
+			})).ServeHTTP(httptest.NewRecorder(), request)
 			urlService.EXPECT().GetUserURLs(request.Context(), "user-id").Return(tt.result, tt.serviceErr)
 			handler := NewHandler(*zap.NewNop(), urlService, "http://localhost:8080")
 			response := httptest.NewRecorder()

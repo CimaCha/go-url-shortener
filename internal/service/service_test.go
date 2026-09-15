@@ -15,6 +15,8 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+const testMaxShortURLAttempts = 5
+
 var errStorage = errors.New("storage error")
 
 func TestServiceShorten(t *testing.T) {
@@ -72,7 +74,7 @@ func TestServiceShorten(t *testing.T) {
 				storage.EXPECT().
 					SaveShortURL(ctx, gomock.Any(), "https://example.com/path", "user-id").
 					Return("", repository.ErrShortURLExists).
-					Times(maxShortURLAttempts)
+					Times(testMaxShortURLAttempts)
 			},
 			wantErr: ErrUniqueShortURL,
 		},
@@ -99,7 +101,7 @@ func TestServiceShorten(t *testing.T) {
 				tt.setup(storage, ctx, &storedShortURL)
 			}
 
-			got, err := NewService(storage).Shorten(ctx, tt.fullURL, "user-id")
+			got, err := newTestService(t, storage, testMaxShortURLAttempts, 10).Shorten(ctx, tt.fullURL, "user-id")
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 				if errors.Is(tt.wantErr, ErrFullURLExists) {
@@ -129,7 +131,7 @@ func TestServiceShortenBatchReturnsStoredURLs(t *testing.T) {
 			return nil
 		})
 
-	got, err := NewService(storage).ShortenBatch(ctx, []*model.OriginalURLRecord{
+	got, err := newTestService(t, storage, testMaxShortURLAttempts, 10).ShortenBatch(ctx, []*model.OriginalURLRecord{
 		{CorrelationID: "first", OriginalURL: "https://example.com/first"},
 		{CorrelationID: "second", OriginalURL: "https://example.com/second"},
 	}, "user-id")
@@ -163,7 +165,7 @@ func TestServiceShortenBatchRegeneratesURLsAfterCollision(t *testing.T) {
 		}).
 		Times(2)
 
-	got, err := NewService(storage).ShortenBatch(ctx, []*model.OriginalURLRecord{
+	got, err := newTestService(t, storage, testMaxShortURLAttempts, 10).ShortenBatch(ctx, []*model.OriginalURLRecord{
 		{CorrelationID: "first", OriginalURL: "https://example.com/first"},
 		{CorrelationID: "second", OriginalURL: "https://example.com/second"},
 	}, "user-id")
@@ -182,9 +184,9 @@ func TestServiceShortenBatchReturnsErrorAfterMaximumCollisions(t *testing.T) {
 	storage.EXPECT().
 		SaveShortURLBatch(ctx, gomock.Any(), "user-id").
 		Return(repository.ErrShortURLExists).
-		Times(maxShortURLAttempts)
+		Times(testMaxShortURLAttempts)
 
-	got, err := NewService(storage).ShortenBatch(ctx, []*model.OriginalURLRecord{
+	got, err := newTestService(t, storage, testMaxShortURLAttempts, 10).ShortenBatch(ctx, []*model.OriginalURLRecord{
 		{CorrelationID: "first", OriginalURL: "https://example.com/first"},
 	}, "user-id")
 
@@ -198,7 +200,7 @@ func TestServiceShortenBatchReturnsRepositoryError(t *testing.T) {
 	storage := mocks.NewMockURLStorage(controller)
 	storage.EXPECT().SaveShortURLBatch(ctx, gomock.Any(), "user-id").Return(errStorage)
 
-	got, err := NewService(storage).ShortenBatch(ctx, []*model.OriginalURLRecord{
+	got, err := newTestService(t, storage, testMaxShortURLAttempts, 10).ShortenBatch(ctx, []*model.OriginalURLRecord{
 		{CorrelationID: "first", OriginalURL: "https://example.com/first"},
 	}, "user-id")
 
@@ -211,7 +213,7 @@ func TestServiceShortenBatchRejectsEmptyList(t *testing.T) {
 	controller := gomock.NewController(t)
 	storage := mocks.NewMockURLStorage(controller)
 
-	got, err := NewService(storage).ShortenBatch(context.Background(), nil, "user-id")
+	got, err := newTestService(t, storage, testMaxShortURLAttempts, 10).ShortenBatch(context.Background(), nil, "user-id")
 
 	assert.ErrorIs(t, err, ErrEmptyURLList)
 	assert.Nil(t, got)
@@ -231,7 +233,7 @@ func TestServiceShortenBatchRejectsEmptyRecord(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewService(storage).ShortenBatch(context.Background(), tt.batch, "user-id")
+			got, err := newTestService(t, storage, testMaxShortURLAttempts, 10).ShortenBatch(context.Background(), tt.batch, "user-id")
 			assert.ErrorIs(t, err, ErrEmptyURL)
 			assert.Nil(t, got)
 		})
@@ -248,7 +250,7 @@ func TestServiceDeleteBatch(t *testing.T) {
 	storage.EXPECT().GetShortURLData(gomock.Any(), "missing").Return(nil, repository.ErrURLNotFound)
 	storage.EXPECT().DeleteURLsBatch(ctx, []string{"own"}, "user-id").Return(nil)
 
-	err := NewService(storage).DeleteBatch(ctx, []string{"own", "foreign", "deleted", "missing"}, "user-id")
+	err := newTestService(t, storage, testMaxShortURLAttempts, 10).DeleteBatch(ctx, []string{"own", "foreign", "deleted", "missing"}, "user-id")
 
 	assert.NoError(t, err)
 }
@@ -259,7 +261,7 @@ func TestServiceDeleteBatchWrapsLookupError(t *testing.T) {
 	storage := mocks.NewMockURLStorage(controller)
 	storage.EXPECT().GetShortURLData(gomock.Any(), "first").Return(nil, errStorage)
 
-	err := NewService(storage).DeleteBatch(ctx, []string{"first"}, "user-id")
+	err := newTestService(t, storage, testMaxShortURLAttempts, 10).DeleteBatch(ctx, []string{"first"}, "user-id")
 
 	assert.ErrorIs(t, err, ErrRepository)
 	assert.ErrorIs(t, err, errStorage)
@@ -272,7 +274,7 @@ func TestServiceDeleteBatchWrapsDeleteError(t *testing.T) {
 	storage.EXPECT().GetShortURLData(gomock.Any(), "first").Return(&model.StorageRecord{UserID: "user-id"}, nil)
 	storage.EXPECT().DeleteURLsBatch(ctx, []string{"first"}, "user-id").Return(errStorage)
 
-	err := NewService(storage).DeleteBatch(ctx, []string{"first"}, "user-id")
+	err := newTestService(t, storage, testMaxShortURLAttempts, 10).DeleteBatch(ctx, []string{"first"}, "user-id")
 
 	assert.ErrorIs(t, err, ErrRepository)
 	assert.ErrorIs(t, err, errStorage)
@@ -283,7 +285,7 @@ func TestServiceDeleteBatchRejectsNilMetadata(t *testing.T) {
 	storage := mocks.NewMockURLStorage(controller)
 	storage.EXPECT().GetShortURLData(gomock.Any(), "first").Return(nil, nil)
 
-	err := NewService(storage).DeleteBatch(context.Background(), []string{"first"}, "user-id")
+	err := newTestService(t, storage, testMaxShortURLAttempts, 10).DeleteBatch(context.Background(), []string{"first"}, "user-id")
 
 	assert.ErrorIs(t, err, ErrRepository)
 }
@@ -300,7 +302,7 @@ func TestServiceDeleteBatchHonorsCanceledContext(t *testing.T) {
 		}).
 		AnyTimes()
 
-	err := NewService(storage).DeleteBatch(ctx, []string{"first"}, "user-id")
+	err := newTestService(t, storage, testMaxShortURLAttempts, 10).DeleteBatch(ctx, []string{"first"}, "user-id")
 
 	assert.ErrorIs(t, err, ErrRepository)
 	assert.ErrorIs(t, err, context.Canceled)
@@ -310,7 +312,7 @@ func TestServiceDeleteBatchRejectsEmptyList(t *testing.T) {
 	controller := gomock.NewController(t)
 	storage := mocks.NewMockURLStorage(controller)
 
-	err := NewService(storage).DeleteBatch(context.Background(), nil, "user-id")
+	err := newTestService(t, storage, testMaxShortURLAttempts, 10).DeleteBatch(context.Background(), nil, "user-id")
 
 	assert.ErrorIs(t, err, ErrEmptyURLList)
 }
@@ -320,7 +322,7 @@ func TestServiceDeleteBatchSkipsDeleteWhenNoOwnedURLs(t *testing.T) {
 	storage := mocks.NewMockURLStorage(controller)
 	storage.EXPECT().GetShortURLData(gomock.Any(), "foreign").Return(&model.StorageRecord{UserID: "other-user"}, nil)
 
-	err := NewService(storage).DeleteBatch(context.Background(), []string{"foreign"}, "user-id")
+	err := newTestService(t, storage, testMaxShortURLAttempts, 10).DeleteBatch(context.Background(), []string{"foreign"}, "user-id")
 
 	assert.NoError(t, err)
 }
@@ -346,7 +348,7 @@ func TestServiceDeleteBatchLooksUpURLsConcurrently(t *testing.T) {
 		Return(nil)
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- NewService(storage).DeleteBatch(ctx, []string{"first", "second"}, "user-id")
+		errCh <- newTestService(t, storage, testMaxShortURLAttempts, 10).DeleteBatch(ctx, []string{"first", "second"}, "user-id")
 	}()
 
 	for range 2 {
@@ -354,12 +356,12 @@ func TestServiceDeleteBatchLooksUpURLsConcurrently(t *testing.T) {
 		case <-started:
 		case <-time.After(time.Second):
 			close(release)
-			<-errCh
+			awaitDeletion(t, errCh)
 			t.Fatal("URL lookups did not run concurrently")
 		}
 	}
 	close(release)
-	assert.NoError(t, <-errCh)
+	assert.NoError(t, awaitDeletion(t, errCh))
 }
 
 func TestServiceDeleteBatchLimitsConcurrentLookups(t *testing.T) {
@@ -398,7 +400,7 @@ func TestServiceDeleteBatchLimitsConcurrentLookups(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- NewService(storage).DeleteBatch(ctx, shortURLs, "user-id")
+		errCh <- newTestService(t, storage, testMaxShortURLAttempts, 10).DeleteBatch(ctx, shortURLs, "user-id")
 	}()
 
 	for range maxConcurrentLookups {
@@ -406,7 +408,7 @@ func TestServiceDeleteBatchLimitsConcurrentLookups(t *testing.T) {
 		case <-started:
 		case <-time.After(time.Second):
 			close(release)
-			<-errCh
+			awaitDeletion(t, errCh)
 			t.Fatal("ten URL lookups did not start")
 		}
 	}
@@ -418,7 +420,7 @@ func TestServiceDeleteBatchLimitsConcurrentLookups(t *testing.T) {
 	}
 	close(release)
 
-	assert.NoError(t, <-errCh)
+	assert.NoError(t, awaitDeletion(t, errCh))
 	assert.False(t, exceeded)
 	assert.Equal(t, int32(maxConcurrentLookups), atomic.LoadInt32(&peakLookups))
 }
@@ -430,7 +432,7 @@ func TestServiceGetUserURLs(t *testing.T) {
 	want := []*model.UserRecord{{ShortURL: "short", OriginalURL: "https://example.com"}}
 	storage.EXPECT().GetUserURLs(ctx, "user-id").Return(want, nil)
 
-	got, err := NewService(storage).GetUserURLs(ctx, "user-id")
+	got, err := newTestService(t, storage, testMaxShortURLAttempts, 10).GetUserURLs(ctx, "user-id")
 
 	assert.NoError(t, err)
 	assert.Equal(t, want, got)
@@ -442,7 +444,7 @@ func TestServiceGetUserURLsMapsNotFound(t *testing.T) {
 	storage := mocks.NewMockURLStorage(controller)
 	storage.EXPECT().GetUserURLs(ctx, "user-id").Return(nil, repository.ErrUserNotFound)
 
-	got, err := NewService(storage).GetUserURLs(ctx, "user-id")
+	got, err := newTestService(t, storage, testMaxShortURLAttempts, 10).GetUserURLs(ctx, "user-id")
 
 	assert.ErrorIs(t, err, ErrUserNotFound)
 	assert.Nil(t, got)
@@ -500,7 +502,7 @@ func TestServiceResolve(t *testing.T) {
 				tt.setup(storage, ctx)
 			}
 
-			got, err := NewService(storage).Resolve(ctx, tt.shortURL)
+			got, err := newTestService(t, storage, testMaxShortURLAttempts, 10).Resolve(ctx, tt.shortURL)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 			} else {
@@ -508,5 +510,23 @@ func TestServiceResolve(t *testing.T) {
 			}
 			assert.Equal(t, tt.want, got)
 		})
+	}
+}
+
+func newTestService(t *testing.T, storage URLStorage, attempts, concurrency int) Service {
+	t.Helper()
+	s := NewService(storage, attempts, concurrency)
+	t.Cleanup(s.Close)
+	return s
+}
+
+func awaitDeletion(t *testing.T, result <-chan error) error {
+	t.Helper()
+	select {
+	case err := <-result:
+		return err
+	case <-time.After(time.Second):
+		t.Fatal("deletion did not finish")
+		return nil
 	}
 }

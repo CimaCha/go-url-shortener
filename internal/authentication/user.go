@@ -1,6 +1,7 @@
 package authentication
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -12,7 +13,19 @@ import (
 
 const TokenExp = time.Hour * 3
 
-func AuthMiddleware(log *zap.Logger, jwtBuilder JWTBuilder) func(http.Handler) http.Handler {
+type contextKey struct{}
+
+func getUserID(ctx context.Context) string {
+	id, _ := ctx.Value(contextKey{}).(string)
+	return id
+}
+
+// UserID returns the authenticated user ID, or an empty string if absent.
+func UserID(ctx context.Context) string {
+	return getUserID(ctx)
+}
+
+func AuthMiddleware(log *zap.Logger, jwtBuilder TokenBuilder, userIdParser UserIDParser) func(http.Handler) http.Handler {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			jwtCookie, err := request.Cookie("jwt")
@@ -29,7 +42,7 @@ func AuthMiddleware(log *zap.Logger, jwtBuilder JWTBuilder) func(http.Handler) h
 					return
 				}
 
-				request.Header.Set("userID", id)
+				request = request.WithContext(context.WithValue(request.Context(), contextKey{}, id))
 
 				cookie := &http.Cookie{
 					Name:     "jwt",
@@ -51,12 +64,12 @@ func AuthMiddleware(log *zap.Logger, jwtBuilder JWTBuilder) func(http.Handler) h
 				return
 			}
 
-			userID, err := jwtBuilder.GetUserID(jwtCookie.Value)
+			userID, err := userIdParser.GetUserID(jwtCookie.Value)
 			if err != nil {
 				http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 				return
 			}
-			request.Header.Set("userID", userID)
+			request = request.WithContext(context.WithValue(request.Context(), contextKey{}, userID))
 			handler.ServeHTTP(writer, request)
 		})
 	}
