@@ -42,16 +42,16 @@ func (m *MockShortener) EXPECT() *MockShortenerMockRecorder {
 }
 
 // ShortenBatch mocks base method.
-func (m *MockShortener) ShortenBatch(ctx context.Context, fullURLBatch []*model.OriginalURLRecord) ([]*model.ShortURLRecord, error) {
+func (m *MockShortener) ShortenBatch(ctx context.Context, fullURLBatch []*model.OriginalURLRecord, userID string) ([]*model.ShortURLRecord, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ShortenBatch", ctx, fullURLBatch)
+	ret := m.ctrl.Call(m, "ShortenBatch", ctx, fullURLBatch, userID)
 	ret0, _ := ret[0].([]*model.ShortURLRecord)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ShortenBatch indicates an expected call of ShortenBatch.
-func (mr *MockShortenerMockRecorder) ShortenBatch(ctx, fullURLBatch any) *gomock.Call {
+func (mr *MockShortenerMockRecorder) ShortenBatch(ctx, fullURLBatch, userID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShortenBatch", reflect.TypeOf((*MockShortener)(nil).ShortenBatch), ctx, fullURLBatch)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShortenBatch", reflect.TypeOf((*MockShortener)(nil).ShortenBatch), ctx, fullURLBatch, userID)
 }

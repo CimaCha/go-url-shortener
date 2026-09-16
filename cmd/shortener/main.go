@@ -3,19 +3,23 @@ package main
 import (
 	"context"
 	"errors"
-	apishortenbatch "github.com/CimaCha/go-url-shortener/internal/handler/post-api-shorten-batch"
-	"github.com/CimaCha/go-url-shortener/internal/repository"
-	database_storage "github.com/CimaCha/go-url-shortener/internal/repository/database-storage"
-	"github.com/CimaCha/go-url-shortener/internal/repository/file"
 	"log"
 	"net/http"
+	"time"
 
+	"github.com/CimaCha/go-url-shortener/internal/authentication"
 	"github.com/CimaCha/go-url-shortener/internal/config"
+	apideletebatch "github.com/CimaCha/go-url-shortener/internal/handler/delete-url-batch"
+	userurls "github.com/CimaCha/go-url-shortener/internal/handler/get-api-user-urls"
 	"github.com/CimaCha/go-url-shortener/internal/handler/get-full-url"
 	getping "github.com/CimaCha/go-url-shortener/internal/handler/get-ping"
+	apishortenbatch "github.com/CimaCha/go-url-shortener/internal/handler/post-api-shorten-batch"
 	apishortenurl "github.com/CimaCha/go-url-shortener/internal/handler/post-api-shorten-url"
 	"github.com/CimaCha/go-url-shortener/internal/handler/post-shorten-url"
 	"github.com/CimaCha/go-url-shortener/internal/logger"
+	"github.com/CimaCha/go-url-shortener/internal/repository"
+	databasestorage "github.com/CimaCha/go-url-shortener/internal/repository/database-storage"
+	"github.com/CimaCha/go-url-shortener/internal/repository/file"
 	shortenerrouter "github.com/CimaCha/go-url-shortener/internal/router"
 	"github.com/CimaCha/go-url-shortener/internal/service"
 	"go.uber.org/zap"
@@ -50,7 +54,7 @@ func run(log zap.Logger) error {
 
 	switch {
 	case cfg.DatabaseURL != "":
-		dbStorage, err := database_storage.NewDatabaseStorage(ctx, cfg.DatabaseURL)
+		dbStorage, err := databasestorage.NewDatabaseStorage(ctx, cfg.DatabaseURL)
 		if err != nil {
 			return err
 		}
@@ -67,23 +71,34 @@ func run(log zap.Logger) error {
 		storage = fileStorage
 
 	default:
-		storage = repository.NewMemoryURLStorage(make(map[string]string))
+		storage = repository.NewMemoryURLStorage(make(map[string]repository.URLData))
 	}
 
-	urlService := service.NewService(storage)
+	urlService := service.NewService(storage, cfg.MaxShortURLsAttempts, cfg.DeleteBatchConcurrency)
+	defer urlService.Close()
 
 	shortenURLHandler := shortenurl.NewShortenURLHandler(*log.With(zap.String("handler", "shorten URL")), urlService, cfg.BasicShortenAddress)
 	apiShortenURLHandler := apishortenurl.NewAPIShortenURLHandler(*log.With(zap.String("handler", "api shorten URL")), urlService, cfg.BasicShortenAddress)
 	getFullURLHandler := fullurl.NewGetFullURLHandler(*log.With(zap.String("handler", "get full URL")), urlService)
 	apiShortenBatchHandler := apishortenbatch.NewAPIShortenBatchHandler(*log.With(zap.String("handler", "api shorten batch")), urlService, cfg.BasicShortenAddress)
+	userURLsHandler := userurls.NewHandler(*log.With(zap.String("handler", "get user URLs")), urlService, cfg.BasicShortenAddress)
+	deleteURLsHandler := apideletebatch.NewAPIDeleteBatchHandler(*log.With(zap.String("handler", "delete URLs")), urlService, cfg.DeleteBatchSize, time.Duration(cfg.DeletionTimeout)*time.Second)
+	defer deleteURLsHandler.Close()
+
+	jwtBuilder := authentication.NewJWTBuilder([]byte(cfg.SecretKey))
+	userIDParser := authentication.NewUserIDParser([]byte(cfg.SecretKey))
 
 	router := shortenerrouter.New(
 		log.With(zap.String("layer", "router")),
+		jwtBuilder,
+		userIDParser,
 		shortenURLHandler,
 		apiShortenURLHandler,
 		getFullURLHandler,
 		pingHandler,
-		apiShortenBatchHandler)
+		apiShortenBatchHandler,
+		userURLsHandler,
+		deleteURLsHandler)
 
 	err = http.ListenAndServe(cfg.Address, router)
 	if err != nil {

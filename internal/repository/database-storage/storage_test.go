@@ -11,6 +11,7 @@ import (
 	"github.com/CimaCha/go-url-shortener/internal/model"
 	"github.com/CimaCha/go-url-shortener/internal/repository"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
 )
@@ -31,12 +32,41 @@ func TestStorage(t *testing.T) {
 		{
 			name: "saves and finds URL",
 			run: func(t *testing.T, ctx context.Context, storage *Storage) {
-				storedShortURL, err := storage.SaveShortURL(ctx, "short", "https://example.com")
+				storedShortURL, err := storage.SaveShortURL(ctx, "short", "https://example.com", "")
 				require.NoError(t, err)
 				require.Empty(t, storedShortURL)
 				fullURL, err := storage.FindFullURL(ctx, "short")
 				require.NoError(t, err)
 				require.Equal(t, "https://example.com", fullURL)
+			},
+		},
+		{
+			name: "saves multiple URLs and a batch for one user",
+			run: func(t *testing.T, ctx context.Context, storage *Storage) {
+				for _, id := range []string{"first", "second"} {
+					_, err := storage.SaveShortURL(ctx, id, "https://example.com/"+id, "user")
+					require.NoError(t, err)
+				}
+				require.NoError(t, storage.SaveShortURLBatch(ctx, []*model.URLRecord{
+					{ShortURL: "third", OriginalURL: "https://example.com/third"},
+					{ShortURL: "fourth", OriginalURL: "https://example.com/fourth"},
+				}, "user"))
+				urls, err := storage.GetUserURLs(ctx, "user")
+				require.NoError(t, err)
+				require.Len(t, urls, 4)
+			},
+		},
+		{
+			name: "preserves other unique constraint errors",
+			run: func(t *testing.T, ctx context.Context, storage *Storage) {
+				_, err := storage.Pool.Exec(ctx, "CREATE UNIQUE INDEX test_user_unique ON urls(user_id)")
+				require.NoError(t, err)
+				_, err = storage.SaveShortURL(ctx, "first", "https://example.com/first", "user")
+				require.NoError(t, err)
+				_, err = storage.SaveShortURL(ctx, "second", "https://example.com/second", "user")
+				var pgErr *pgconn.PgError
+				require.ErrorAs(t, err, &pgErr)
+				require.Equal(t, "test_user_unique", pgErr.ConstraintName)
 			},
 		},
 		{
@@ -49,18 +79,18 @@ func TestStorage(t *testing.T) {
 		{
 			name: "maps duplicate error",
 			run: func(t *testing.T, ctx context.Context, storage *Storage) {
-				_, err := storage.SaveShortURL(ctx, "short", "https://example.com")
+				_, err := storage.SaveShortURL(ctx, "short", "https://example.com", "")
 				require.NoError(t, err)
-				_, err = storage.SaveShortURL(ctx, "short", "https://other.example.com")
+				_, err = storage.SaveShortURL(ctx, "short", "https://other.example.com", "")
 				require.ErrorIs(t, err, repository.ErrShortURLExists)
 			},
 		},
 		{
 			name: "returns existing short URL for duplicate full URL",
 			run: func(t *testing.T, ctx context.Context, storage *Storage) {
-				_, err := storage.SaveShortURL(ctx, "first", "https://example.com")
+				_, err := storage.SaveShortURL(ctx, "first", "https://example.com", "")
 				require.NoError(t, err)
-				storedShortURL, err := storage.SaveShortURL(ctx, "second", "https://example.com")
+				storedShortURL, err := storage.SaveShortURL(ctx, "second", "https://example.com", "")
 				require.ErrorIs(t, err, repository.ErrFullURLExists)
 				require.Equal(t, "first", storedShortURL)
 			},
@@ -68,12 +98,12 @@ func TestStorage(t *testing.T) {
 		{
 			name: "rolls back batch and maps duplicate short URL",
 			run: func(t *testing.T, ctx context.Context, storage *Storage) {
-				_, err := storage.SaveShortURL(ctx, "existing", "https://example.com/existing")
+				_, err := storage.SaveShortURL(ctx, "existing", "https://example.com/existing", "")
 				require.NoError(t, err)
-				err = storage.SaveShortUrlBatch(ctx, []*model.URLRecord{
+				err = storage.SaveShortURLBatch(ctx, []*model.URLRecord{
 					{ShortURL: "new", OriginalURL: "https://example.com/new"},
 					{ShortURL: "existing", OriginalURL: "https://example.com/collision"},
-				})
+				}, "")
 				require.ErrorIs(t, err, repository.ErrShortURLExists)
 				_, err = storage.FindFullURL(ctx, "new")
 				require.ErrorIs(t, err, repository.ErrURLNotFound)
@@ -82,15 +112,34 @@ func TestStorage(t *testing.T) {
 		{
 			name: "rolls back batch and maps duplicate full URL",
 			run: func(t *testing.T, ctx context.Context, storage *Storage) {
-				_, err := storage.SaveShortURL(ctx, "existing", "https://example.com/existing")
+				_, err := storage.SaveShortURL(ctx, "existing", "https://example.com/existing", "")
 				require.NoError(t, err)
-				err = storage.SaveShortUrlBatch(ctx, []*model.URLRecord{
+				err = storage.SaveShortURLBatch(ctx, []*model.URLRecord{
 					{ShortURL: "new", OriginalURL: "https://example.com/new"},
 					{ShortURL: "other", OriginalURL: "https://example.com/existing"},
-				})
+				}, "")
 				require.ErrorIs(t, err, repository.ErrFullURLExists)
 				_, err = storage.FindFullURL(ctx, "new")
 				require.ErrorIs(t, err, repository.ErrURLNotFound)
+			},
+		},
+		{
+			name: "deletes only URLs owned by user",
+			run: func(t *testing.T, ctx context.Context, storage *Storage) {
+				_, err := storage.SaveShortURL(ctx, "own", "https://example.com/own", "user-id")
+				require.NoError(t, err)
+				_, err = storage.SaveShortURL(ctx, "foreign", "https://example.com/foreign", "other-user")
+				require.NoError(t, err)
+
+				require.NoError(t, storage.DeleteURLsBatch(ctx, []string{"own", "foreign", "missing"}, "user-id"))
+				data, err := storage.GetShortURLData(ctx, "own")
+				require.NoError(t, err)
+				require.Equal(t, &model.StorageRecord{UserID: "user-id", OriginalURL: "https://example.com/own", DeletedFlag: true}, data)
+				_, err = storage.FindFullURL(ctx, "own")
+				require.ErrorIs(t, err, repository.ErrURLHasGone)
+				fullURL, err := storage.FindFullURL(ctx, "foreign")
+				require.NoError(t, err)
+				require.Equal(t, "https://example.com/foreign", fullURL)
 			},
 		},
 	}
@@ -134,4 +183,15 @@ func newTestDSN(t *testing.T) string {
 	query.Set("search_path", schema)
 	databaseURL.RawQuery = query.Encode()
 	return databaseURL.String()
+}
+
+func TestSaveShortURLPreservesCanceledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	pool, err := pgxpool.New(ctx, "postgres://test:test@127.0.0.1:1/test?sslmode=disable")
+	require.NoError(t, err)
+	defer pool.Close()
+	stored, err := (Storage{Pool: pool}).SaveShortURL(ctx, "short", "https://example.com", "user")
+	require.ErrorIs(t, err, context.Canceled)
+	require.Empty(t, stored)
 }

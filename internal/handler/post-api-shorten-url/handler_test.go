@@ -3,6 +3,8 @@ package apishortenurl
 import (
 	"context"
 	"errors"
+	"github.com/CimaCha/go-url-shortener/internal/authentication"
+	authmocks "github.com/CimaCha/go-url-shortener/internal/authentication/mocks"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -38,7 +40,7 @@ func TestAPIShortenURLHandler(t *testing.T) {
 			body: `{"url":"https://example.com/path"}`,
 			setup: func(urlService *mocks.MockShortener, ctx context.Context) {
 				urlService.EXPECT().
-					Shorten(ctx, "https://example.com/path").
+					Shorten(ctx, "https://example.com/path", "user-id").
 					Return("short", nil)
 			},
 			wantStatus:      http.StatusCreated,
@@ -50,7 +52,7 @@ func TestAPIShortenURLHandler(t *testing.T) {
 			name: "empty URL",
 			body: `{}`,
 			setup: func(urlService *mocks.MockShortener, ctx context.Context) {
-				urlService.EXPECT().Shorten(ctx, "").Return("", service.ErrEmptyURL)
+				urlService.EXPECT().Shorten(ctx, "", "user-id").Return("", service.ErrEmptyURL)
 			},
 			wantStatus:      http.StatusBadRequest,
 			wantBody:        "empty URL\n",
@@ -60,7 +62,7 @@ func TestAPIShortenURLHandler(t *testing.T) {
 			name: "service error",
 			body: `{"url":"https://example.com/path"}`,
 			setup: func(urlService *mocks.MockShortener, ctx context.Context) {
-				urlService.EXPECT().Shorten(ctx, "https://example.com/path").Return("", errHandlerService)
+				urlService.EXPECT().Shorten(ctx, "https://example.com/path", "user-id").Return("", errHandlerService)
 			},
 			wantStatus:      http.StatusInternalServerError,
 			wantBody:        "Internal Server Error\n",
@@ -91,6 +93,14 @@ func TestAPIShortenURLHandler(t *testing.T) {
 				body = errorReader{}
 			}
 			request := httptest.NewRequest(http.MethodPost, "/api/shorten", body)
+			request.Header.Set("userID", "forged-user")
+			request.AddCookie(&http.Cookie{Name: "jwt", Value: "test-token"})
+			parser := authmocks.NewMockUserIDParser(controller)
+			parser.EXPECT().GetUserID("test-token").Return("user-id", nil)
+			builder := authmocks.NewMockTokenBuilder(controller)
+			authentication.AuthMiddleware(zap.NewNop(), builder, parser)(http.HandlerFunc(func(_ http.ResponseWriter, authenticated *http.Request) {
+				request = authenticated
+			})).ServeHTTP(httptest.NewRecorder(), request)
 			if tt.setup != nil {
 				tt.setup(urlService, request.Context())
 			}

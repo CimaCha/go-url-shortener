@@ -41,6 +41,10 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 			http.Error(res, err.Error(), http.StatusBadRequest)
 			return
 		}
+		if errors.Is(err, service.ErrURLHasGone) {
+			http.Error(res, err.Error(), http.StatusGone)
+			return
+		}
 		h.log.Error("can't resolve URL", zap.Error(err))
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return

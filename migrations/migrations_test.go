@@ -33,6 +33,12 @@ func TestUpCreatesSchemaAndIsIdempotent(t *testing.T) {
 	var fullURL string
 	require.NoError(t, pool.QueryRow(ctx, "SELECT full_url FROM urls WHERE short_url = $1", "short").Scan(&fullURL))
 	require.Equal(t, "https://example.com", fullURL)
+
+	var deleted bool
+	require.NoError(t, pool.QueryRow(ctx, "SELECT deleted_flag FROM urls WHERE short_url = $1", "short").Scan(&deleted))
+	require.False(t, deleted)
+	_, err = pool.Exec(ctx, "INSERT INTO urls(short_url, full_url, deleted_flag) VALUES($1, $2, NULL)", "invalid", "https://invalid.example.com")
+	require.Error(t, err)
 }
 
 func TestUpUsesMigrationLock(t *testing.T) {

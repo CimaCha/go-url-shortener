@@ -5,17 +5,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/CimaCha/go-url-shortener/internal/authentication"
+	"io"
+	"net/http"
+
 	"github.com/CimaCha/go-url-shortener/internal/model"
 	"github.com/CimaCha/go-url-shortener/internal/service"
 	"go.uber.org/zap"
-	"io"
-	"net/http"
 )
 
 //go:generate mockgen -source=handler.go -destination=mocks/mock_url_handler.gen.go -package=mocks
 
 type Shortener interface {
-	ShortenBatch(ctx context.Context, fullURLBatch []*model.OriginalURLRecord) ([]*model.ShortURLRecord, error)
+	ShortenBatch(ctx context.Context, fullURLBatch []*model.OriginalURLRecord, userID string) ([]*model.ShortURLRecord, error)
 }
 
 type Handler struct {
@@ -45,9 +47,9 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, err.Error(), http.StatusBadRequest)
 		return
 	}
-	shortURLs, err := h.service.ShortenBatch(req.Context(), decodedBody)
+	shortURLs, err := h.service.ShortenBatch(req.Context(), decodedBody, authentication.UserID(req.Context()))
 	if err != nil {
-		if errors.Is(err, service.ErrEmptyURLList) {
+		if errors.Is(err, service.ErrEmptyURLList) || errors.Is(err, service.ErrEmptyURL) {
 			http.Error(res, err.Error(), http.StatusBadRequest)
 		} else {
 			h.log.Error("can't shorten URL", zap.Error(err))

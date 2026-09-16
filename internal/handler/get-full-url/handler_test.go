@@ -61,6 +61,15 @@ func TestGetFullURLHandler(t *testing.T) {
 			wantStatus: http.StatusInternalServerError,
 			wantBody:   "Internal Server Error\n",
 		},
+		{
+			name:     "deleted URL",
+			shortURL: "deleted",
+			setup: func(urlService *mocks.MockResolver, ctx context.Context) {
+				urlService.EXPECT().Resolve(ctx, "deleted").Return("", service.ErrURLHasGone)
+			},
+			wantStatus: http.StatusGone,
+			wantBody:   "URL was deleted\n",
+		},
 	}
 
 	for _, tt := range tests {
