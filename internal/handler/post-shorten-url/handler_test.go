@@ -2,7 +2,9 @@ package shortenurl
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"github.com/CimaCha/go-url-shortener/internal/audit"
 	"github.com/CimaCha/go-url-shortener/internal/authentication"
 	authmocks "github.com/CimaCha/go-url-shortener/internal/authentication/mocks"
 	"io"
@@ -14,8 +16,10 @@ import (
 	"github.com/CimaCha/go-url-shortener/internal/handler/post-shorten-url/mocks"
 	"github.com/CimaCha/go-url-shortener/internal/service"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
+	"gopkg.in/h2non/gentleman.v2"
 )
 
 var errHandlerService = errors.New("service error")
@@ -103,5 +107,34 @@ func TestShortenURLHandler(t *testing.T) {
 			assert.Equal(t, tt.wantBody, response.Body.String())
 			assert.Equal(t, tt.wantContentType, response.Header().Get("Content-Type"))
 		})
+	}
+}
+
+func TestShortenURLHandlerReportsOriginalURL(t *testing.T) {
+	const originalURL = "https://example.com/path"
+	events := make(chan audit.Exposure, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var event audit.Exposure
+		if err := json.NewDecoder(r.Body).Decode(&event); err == nil {
+			events <- event
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+	producer := audit.Producer{}
+	producer.Register(audit.NewURLClientSubscriber("url", server.URL, gentleman.New()))
+	urlService := mocks.NewMockShortener(gomock.NewController(t))
+	urlService.EXPECT().Shorten(gomock.Any(), originalURL, "").Return("short", nil)
+	handler := audit.AuditMiddleware(zap.NewNop(), producer, audit.Shorten)(NewShortenURLHandler(*zap.NewNop(), urlService, "http://localhost:8080"))
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/", strings.NewReader(originalURL)))
+
+	require.Equal(t, http.StatusCreated, response.Code)
+	select {
+	case event := <-events:
+		require.Equal(t, originalURL, event.URL)
+	default:
+		t.Fatal("audit event was not sent")
 	}
 }

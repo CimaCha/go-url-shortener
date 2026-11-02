@@ -19,6 +19,8 @@ type Config struct {
 	DeleteBatchConcurrency int    `env:"DELETE_BATCH_CONCURRENCY"`
 	DeleteBatchSize        int    `env:"DELETE_BATCH_SIZE"`
 	DeletionTimeout        int    `env:"DELETION_TIMEOUT"`
+	AuditFile              string `env:"AUDIT_FILE"`
+	AuditURL               string `env:"AUDIT_URL"`
 }
 
 func New() (*Config, error) {
@@ -31,6 +33,8 @@ func New() (*Config, error) {
 	deleteBatchConcurrency := flag.Int("c", 10, "delete batch concurrency")
 	deleteBatchSize := flag.Int("db", 100, "delete batch size")
 	deletionTimeout := flag.Int("dt", 10, "deletion timeout in seconds")
+	auditFile := flag.String("audit-file", "", "path to the audit log file")
+	auditURL := flag.String("audit-url", "", "url for audit log")
 	if err := flag.CommandLine.Parse(os.Args[1:]); err != nil {
 		return nil, err
 	}
@@ -45,6 +49,8 @@ func New() (*Config, error) {
 		DeleteBatchConcurrency: *deleteBatchConcurrency,
 		DeleteBatchSize:        *deleteBatchSize,
 		DeletionTimeout:        *deletionTimeout,
+		AuditFile:              *auditFile,
+		AuditURL:               *auditURL,
 	}
 	if err := env.Parse(&config); err != nil {
 		return nil, err

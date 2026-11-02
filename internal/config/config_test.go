@@ -132,3 +132,13 @@ func TestNumericConfig(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+func TestAuditURLConfig(t *testing.T) {
+	isolateConfig(t, []string{"--audit-url", "http://cli.example/audit"})
+	t.Setenv("AUDIT_URL", "http://env.example/audit")
+
+	cfg, err := New()
+
+	require.NoError(t, err)
+	require.Equal(t, "http://env.example/audit", cfg.AuditURL)
+}
