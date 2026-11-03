@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/CimaCha/go-url-shortener/internal/audit"
 	"github.com/CimaCha/go-url-shortener/internal/service"
 )
 
@@ -40,7 +41,8 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	url, err := h.service.Shorten(req.Context(), string(body), authentication.UserID(req.Context()))
+	fullURL := string(body)
+	url, err := h.service.Shorten(req.Context(), fullURL, authentication.UserID(req.Context()))
 	if err != nil {
 		if errors.Is(err, service.ErrFullURLExists) {
 			finalURL := fmt.Sprintf("%s/%s", h.defaultShortAddress, url)
@@ -62,6 +64,7 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	audit.RecordURL(req.Context(), fullURL)
 	finalURL := fmt.Sprintf("%s/%s", h.defaultShortAddress, url)
 	res.Header().Set("Content-Type", "text/plain")
 	res.WriteHeader(http.StatusCreated)

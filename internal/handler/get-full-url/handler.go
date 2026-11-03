@@ -24,7 +24,8 @@ type Handler struct {
 func NewGetFullURLHandler(log zap.Logger, service Resolver) Handler {
 	return Handler{
 		log:     log,
-		service: service}
+		service: service,
+	}
 }
 
 func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {

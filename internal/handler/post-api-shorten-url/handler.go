@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/CimaCha/go-url-shortener/internal/audit"
 	"github.com/CimaCha/go-url-shortener/internal/authentication"
 	"github.com/CimaCha/go-url-shortener/internal/model"
 	"github.com/CimaCha/go-url-shortener/internal/service"
@@ -69,6 +70,7 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	audit.RecordURL(req.Context(), decodedBody.URL)
 	var encodedBody model.ShortenURLResponse
 	encodedBody.Result = fmt.Sprintf("%s/%s", h.defaultShortAddress, url)
 	responseBody, err := json.Marshal(encodedBody)
