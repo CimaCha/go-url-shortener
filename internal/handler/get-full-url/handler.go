@@ -3,8 +3,9 @@ package fullurl
 import (
 	"context"
 	"errors"
-	"go.uber.org/zap"
 	"net/http"
+
+	"go.uber.org/zap"
 
 	"github.com/CimaCha/go-url-shortener/internal/service"
 	"github.com/go-chi/chi/v5"

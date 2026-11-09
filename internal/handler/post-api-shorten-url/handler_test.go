@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/CimaCha/go-url-shortener/internal/audit"
-	"github.com/CimaCha/go-url-shortener/internal/authentication"
-	authmocks "github.com/CimaCha/go-url-shortener/internal/authentication/mocks"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/CimaCha/go-url-shortener/internal/audit"
+	"github.com/CimaCha/go-url-shortener/internal/authentication"
+	authmocks "github.com/CimaCha/go-url-shortener/internal/authentication/mocks"
 
 	"github.com/CimaCha/go-url-shortener/internal/handler/post-api-shorten-url/mocks"
 	"github.com/CimaCha/go-url-shortener/internal/service"

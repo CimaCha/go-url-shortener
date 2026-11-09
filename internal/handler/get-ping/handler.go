@@ -2,8 +2,9 @@ package ping
 
 import (
 	"context"
-	"go.uber.org/zap"
 	"net/http"
+
+	"go.uber.org/zap"
 )
 
 //go:generate mockgen -source=handler.go -destination=mocks/mock_pinger.gen.go -package=mocks

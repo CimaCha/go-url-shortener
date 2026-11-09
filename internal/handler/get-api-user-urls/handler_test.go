@@ -2,11 +2,12 @@ package userurls
 
 import (
 	"errors"
-	"github.com/CimaCha/go-url-shortener/internal/authentication"
-	authmocks "github.com/CimaCha/go-url-shortener/internal/authentication/mocks"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/CimaCha/go-url-shortener/internal/authentication"
+	authmocks "github.com/CimaCha/go-url-shortener/internal/authentication/mocks"
 
 	"github.com/CimaCha/go-url-shortener/internal/handler/get-api-user-urls/mocks"
 	"github.com/CimaCha/go-url-shortener/internal/model"

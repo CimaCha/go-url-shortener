@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/CimaCha/go-url-shortener/internal/authentication"
-	"go.uber.org/zap"
 	"io"
 	"net/http"
+
+	"github.com/CimaCha/go-url-shortener/internal/authentication"
+	"go.uber.org/zap"
 
 	"github.com/CimaCha/go-url-shortener/internal/audit"
 	"github.com/CimaCha/go-url-shortener/internal/service"

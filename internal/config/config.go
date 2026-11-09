@@ -3,10 +3,11 @@ package config
 import (
 	"flag"
 	"fmt"
-	"github.com/caarlos0/env/v11"
 	"math"
 	"os"
 	"time"
+
+	"github.com/caarlos0/env/v11"
 )
 
 type Config struct {
