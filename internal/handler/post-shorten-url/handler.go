@@ -16,16 +16,19 @@ import (
 
 //go:generate mockgen -source=handler.go -destination=mocks/mock_url_handler.gen.go -package=mocks
 
+// Shortener creates a short ID for a user's original URL.
 type Shortener interface {
 	Shorten(ctx context.Context, fullURL, userID string) (string, error)
 }
 
+// Handler serves the plain-text shortening endpoint.
 type Handler struct {
 	log                 zap.Logger
 	service             Shortener
 	defaultShortAddress string
 }
 
+// NewShortenURLHandler creates a handler for POST /.
 func NewShortenURLHandler(log zap.Logger, service Shortener, defaultShortAddress string) Handler {
 	return Handler{
 		log:                 log,
@@ -34,6 +37,7 @@ func NewShortenURLHandler(log zap.Logger, service Shortener, defaultShortAddress
 	}
 }
 
+// ServeHTTP reads a URL from plain text and writes its short URL with status 201.
 func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 	body, err := io.ReadAll(req.Body)

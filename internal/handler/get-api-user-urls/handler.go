@@ -14,20 +14,24 @@ import (
 
 //go:generate mockgen -source=handler.go -destination=mocks/mock_user_urls_getter.gen.go -package=mocks
 
+// Getter lists the URLs owned by a user.
 type Getter interface {
 	GetUserURLs(ctx context.Context, userID string) ([]*model.UserRecord, error)
 }
 
+// NewHandler creates a handler for GET /api/user/urls.
 func NewHandler(log zap.Logger, service Getter, defaultShortAddress string) Handler {
 	return Handler{log: log, service: service, defaultShortAddress: defaultShortAddress}
 }
 
+// Handler serves the authenticated user's URL list.
 type Handler struct {
 	log                 zap.Logger
 	service             Getter
 	defaultShortAddress string
 }
 
+// ServeHTTP returns the user's URLs as JSON, or status 204 when none exist.
 func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 	userID := authentication.UserID(req.Context())

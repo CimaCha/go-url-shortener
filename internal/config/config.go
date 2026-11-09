@@ -10,6 +10,7 @@ import (
 	"github.com/caarlos0/env/v11"
 )
 
+// Config holds server settings from command-line flags and environment variables.
 type Config struct {
 	Address                string `env:"SERVER_ADDRESS"`
 	BasicShortenAddress    string `env:"BASE_URL"`
@@ -24,6 +25,7 @@ type Config struct {
 	AuditURL               string `env:"AUDIT_URL"`
 }
 
+// New parses configuration and rejects invalid batch and timeout settings.
 func New() (*Config, error) {
 	address := flag.String("a", "localhost:8080", "address of service")
 	baseURL := flag.String("b", "http://localhost:8080", "basic address for short url")

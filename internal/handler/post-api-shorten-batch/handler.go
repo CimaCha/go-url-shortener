@@ -16,10 +16,12 @@ import (
 
 //go:generate mockgen -source=handler.go -destination=mocks/mock_url_handler.gen.go -package=mocks
 
+// Shortener creates short IDs for a batch of original URLs.
 type Shortener interface {
 	ShortenBatch(ctx context.Context, fullURLBatch []*model.OriginalURLRecord, userID string) ([]*model.ShortURLRecord, error)
 }
 
+// Handler serves the JSON batch shortening endpoint.
 type Handler struct {
 	log                 zap.Logger
 	service             Shortener
@@ -28,6 +30,7 @@ type Handler struct {
 
 const maxBatchBodyBytes = 10 << 20
 
+// NewAPIShortenBatchHandler creates a handler for POST /api/shorten/batch.
 func NewAPIShortenBatchHandler(log zap.Logger, service Shortener, defaultShortAddress string) Handler {
 	return Handler{
 		log:                 log,
@@ -36,6 +39,7 @@ func NewAPIShortenBatchHandler(log zap.Logger, service Shortener, defaultShortAd
 	}
 }
 
+// ServeHTTP returns short URLs with their correlation IDs and status 201.
 func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	var decodedBody model.ShortenBatchRequest
 	decoder := json.NewDecoder(http.MaxBytesReader(res, req.Body, maxBatchBodyBytes))

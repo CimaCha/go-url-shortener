@@ -25,10 +25,12 @@ func newCompressReader(r io.ReadCloser) (*compressReader, error) {
 	}, nil
 }
 
+// Read returns decompressed request bytes.
 func (c *compressReader) Read(p []byte) (n int, err error) {
 	return c.zr.Read(p)
 }
 
+// Close releases both the gzip reader and the request body.
 func (c *compressReader) Close() error {
 	return errors.Join(c.zr.Close(), c.r.Close())
 }

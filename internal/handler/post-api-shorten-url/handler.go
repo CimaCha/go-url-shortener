@@ -17,16 +17,19 @@ import (
 
 //go:generate mockgen -source=handler.go -destination=mocks/mock_url_handler.gen.go -package=mocks
 
+// Shortener creates a short ID for a user's original URL.
 type Shortener interface {
 	Shorten(ctx context.Context, fullURL, userID string) (string, error)
 }
 
+// Handler serves the JSON shortening endpoint.
 type Handler struct {
 	log                 zap.Logger
 	service             Shortener
 	defaultShortAddress string
 }
 
+// NewAPIShortenURLHandler creates a handler for POST /api/shorten.
 func NewAPIShortenURLHandler(log zap.Logger, service Shortener, defaultShortAddress string) Handler {
 	return Handler{
 		log:                 log,
@@ -35,6 +38,7 @@ func NewAPIShortenURLHandler(log zap.Logger, service Shortener, defaultShortAddr
 	}
 }
 
+// ServeHTTP reads a JSON URL request and returns a JSON short URL with status 201.
 func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	var decodedBody model.ShortenURLRequest
 	body, err := io.ReadAll(req.Body)

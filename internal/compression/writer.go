@@ -33,10 +33,12 @@ func newCompressWriter(w http.ResponseWriter, method string, supportsGzip bool) 
 	}
 }
 
+// Header returns the underlying response headers.
 func (c *compressWriter) Header() http.Header {
 	return c.w.Header()
 }
 
+// Write sends response bytes, compressing them when gzip was negotiated.
 func (c *compressWriter) Write(p []byte) (int, error) {
 	if !c.wroteHeader {
 		if c.Header().Get("Content-Type") == "" {
@@ -50,6 +52,7 @@ func (c *compressWriter) Write(p []byte) (int, error) {
 	return c.w.Write(p)
 }
 
+// WriteHeader sets the response status and negotiates gzip compression.
 func (c *compressWriter) WriteHeader(statusCode int) {
 	if c.wroteHeader {
 		return
@@ -68,7 +71,7 @@ func (c *compressWriter) WriteHeader(statusCode int) {
 	c.w.WriteHeader(statusCode)
 }
 
-// Close закрывает gzip.Writer и досылает все данные из буфера.
+// Close flushes and closes the gzip writer when compression was enabled.
 func (c *compressWriter) Close() error {
 	if c.zw == nil {
 		return nil
@@ -76,10 +79,12 @@ func (c *compressWriter) Close() error {
 	return c.zw.Close()
 }
 
+// Unwrap returns the underlying response writer.
 func (c *compressWriter) Unwrap() http.ResponseWriter {
 	return c.w
 }
 
+// Flush sends buffered gzip data and flushes the underlying writer if supported.
 func (c *compressWriter) Flush() {
 	if !c.wroteHeader {
 		c.WriteHeader(http.StatusOK)
@@ -92,6 +97,7 @@ func (c *compressWriter) Flush() {
 	}
 }
 
+// Hijack delegates connection takeover to the underlying writer when supported.
 func (c *compressWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	hijacker, ok := c.w.(http.Hijacker)
 	if !ok {
@@ -100,6 +106,7 @@ func (c *compressWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return hijacker.Hijack()
 }
 
+// Push delegates server push to the underlying writer when supported.
 func (c *compressWriter) Push(target string, options *http.PushOptions) error {
 	pusher, ok := c.w.(http.Pusher)
 	if !ok {

@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// New assembles the HTTP routes with logging, compression, and authentication middleware.
 func New(log *zap.Logger, jwtBuilder authentication.TokenBuilder, userIDParser authentication.UserIDParser, shortenURLHandler, apiShortenURLHandler, getFullURLHandler, pingHandler, apiShortenBatchHandler, userURLsHandler, deleteURLsHandler http.Handler) http.Handler {
 	router := chi.NewRouter()
 	router.Use(logger.RequestLogger(log))

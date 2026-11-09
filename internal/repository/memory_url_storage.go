@@ -10,13 +10,19 @@ import (
 )
 
 var (
-	ErrURLHasGone     = errors.New("URL was been deleted")
-	ErrURLNotFound    = errors.New("URL not found")
-	ErrUserNotFound   = errors.New("user not found")
+	// ErrURLHasGone indicates that the URL was deleted.
+	ErrURLHasGone = errors.New("URL was been deleted")
+	// ErrURLNotFound indicates that the short ID is absent.
+	ErrURLNotFound = errors.New("URL not found")
+	// ErrUserNotFound indicates that the user has no stored URLs.
+	ErrUserNotFound = errors.New("user not found")
+	// ErrShortURLExists indicates a duplicate short ID.
 	ErrShortURLExists = errors.New("short URL already exists")
-	ErrFullURLExists  = errors.New("full URL already exists")
+	// ErrFullURLExists indicates a duplicate original URL.
+	ErrFullURLExists = errors.New("full URL already exists")
 )
 
+// MemoryURLStorage stores URL mappings and ownership in memory.
 type MemoryURLStorage struct {
 	mu           sync.Mutex
 	urls         map[string]URLData
@@ -24,12 +30,14 @@ type MemoryURLStorage struct {
 	userMap      map[string][]*model.UserRecord
 }
 
+// URLData contains the owner, original URL, and deletion state of a short ID.
 type URLData struct {
 	UserID      string
 	OriginalURL string
 	DeletedFlag bool
 }
 
+// NewMemoryURLStorage initializes storage from a map of short IDs to URL data.
 func NewMemoryURLStorage(urls map[string]URLData) *MemoryURLStorage {
 	if urls == nil {
 		urls = make(map[string]URLData)
@@ -39,6 +47,7 @@ func NewMemoryURLStorage(urls map[string]URLData) *MemoryURLStorage {
 	return &MemoryURLStorage{urls: urls, backwardUrls: backwardUrls, userMap: userMap}
 }
 
+// SaveShortURL stores a mapping or reports a duplicate short or original URL.
 func (s *MemoryURLStorage) SaveShortURL(_ context.Context, shortURL, fullURL, userID string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -63,6 +72,7 @@ func (s *MemoryURLStorage) SaveShortURL(_ context.Context, shortURL, fullURL, us
 	return "", nil
 }
 
+// FindFullURL returns the original URL unless the short ID is absent or deleted.
 func (s *MemoryURLStorage) FindFullURL(_ context.Context, shortURL string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -78,6 +88,7 @@ func (s *MemoryURLStorage) FindFullURL(_ context.Context, shortURL string) (stri
 	return fullURLData.OriginalURL, nil
 }
 
+// Snapshot returns a copy of the current short ID mappings.
 func (s *MemoryURLStorage) Snapshot() map[string]URLData {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -85,6 +96,7 @@ func (s *MemoryURLStorage) Snapshot() map[string]URLData {
 	return maps.Clone(s.urls)
 }
 
+// SaveShortURLBatch stores all mappings atomically or returns a duplicate URL error.
 func (s *MemoryURLStorage) SaveShortURLBatch(_ context.Context, URLRecords []*model.URLRecord, userID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -111,6 +123,7 @@ func (s *MemoryURLStorage) SaveShortURLBatch(_ context.Context, URLRecords []*mo
 	return nil
 }
 
+// GetUserURLs returns the mappings belonging to a user.
 func (s *MemoryURLStorage) GetUserURLs(_ context.Context, userID string) ([]*model.UserRecord, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -121,6 +134,7 @@ func (s *MemoryURLStorage) GetUserURLs(_ context.Context, userID string) ([]*mod
 	return pairs, nil
 }
 
+// GetShortURLData returns ownership and deletion metadata for a short ID.
 func (s *MemoryURLStorage) GetShortURLData(_ context.Context, shortURL string) (*model.StorageRecord, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -136,6 +150,7 @@ func (s *MemoryURLStorage) GetShortURLData(_ context.Context, shortURL string) (
 	}, nil
 }
 
+// DeleteURLsBatch marks only the user's matching short IDs as deleted.
 func (s *MemoryURLStorage) DeleteURLsBatch(_ context.Context, shortURLs []string, userID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

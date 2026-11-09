@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// GzipMiddleware decodes gzip requests and compresses responses when accepted.
 func GzipMiddleware(log *zap.Logger) func(http.Handler) http.Handler {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

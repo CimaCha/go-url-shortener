@@ -11,20 +11,25 @@ import (
 )
 
 var (
+	// ErrWriteNullRecords indicates a nil snapshot.
 	ErrWriteNullRecords = errors.New("write null records")
+	// ErrOpenFileForWrite indicates that the snapshot cannot be written.
 	ErrOpenFileForWrite = errors.New("open file for write error")
 )
 
+// Writer atomically replaces a URL snapshot file.
 type Writer struct {
 	filename string
 }
 
+// NewWriter creates a snapshot writer for filename.
 func NewWriter(filename string) *Writer {
 	return &Writer{
 		filename: filename,
 	}
 }
 
+// WriteRecords writes a JSON snapshot through a temporary file and rename.
 func (w *Writer) WriteRecords(records []*model.FileRecord) error {
 	if records == nil {
 		return ErrWriteNullRecords

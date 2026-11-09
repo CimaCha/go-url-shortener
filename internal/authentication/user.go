@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// TokenExp is the lifetime of a user authentication cookie.
 const TokenExp = time.Hour * 3
 
 type contextKey struct{}
@@ -25,6 +26,7 @@ func UserID(ctx context.Context) string {
 	return getUserID(ctx)
 }
 
+// AuthMiddleware authenticates a JWT cookie or issues one for a new user.
 func AuthMiddleware(log *zap.Logger, jwtBuilder TokenBuilder, userIDParser UserIDParser) func(http.Handler) http.Handler {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

@@ -10,15 +10,18 @@ import (
 )
 
 var (
+	// ErrSendRequest indicates that an HTTP audit delivery failed.
 	ErrSendRequest = errors.New("send audit request error")
 )
 
+// URLClientSubscriber posts audit events as JSON to a remote endpoint.
 type URLClientSubscriber struct {
 	id          string
 	url         string
 	auditClient *gentleman.Client
 }
 
+// NewURLClientSubscriber creates an HTTP audit observer with the given ID.
 func NewURLClientSubscriber(id string, url string, auditClient *gentleman.Client) *URLClientSubscriber {
 	return &URLClientSubscriber{
 		id:          id,

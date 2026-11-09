@@ -13,13 +13,21 @@ import (
 )
 
 var (
-	ErrURLHasGone     = errors.New("URL was deleted")
-	ErrEmptyURL       = errors.New("empty URL")
-	ErrEmptyURLList   = errors.New("empty URL list")
-	ErrURLNotFound    = errors.New("URL not found")
-	ErrUserNotFound   = errors.New("user not found")
-	ErrRepository     = errors.New("error in repository")
-	ErrFullURLExists  = errors.New("full URL already exists")
+	// ErrURLHasGone indicates that a short URL was deleted.
+	ErrURLHasGone = errors.New("URL was deleted")
+	// ErrEmptyURL indicates that a URL is empty.
+	ErrEmptyURL = errors.New("empty URL")
+	// ErrEmptyURLList indicates that a URL batch is empty.
+	ErrEmptyURLList = errors.New("empty URL list")
+	// ErrURLNotFound indicates that a short URL does not exist.
+	ErrURLNotFound = errors.New("URL not found")
+	// ErrUserNotFound indicates that a user has no stored URLs.
+	ErrUserNotFound = errors.New("user not found")
+	// ErrRepository wraps a storage failure.
+	ErrRepository = errors.New("error in repository")
+	// ErrFullURLExists indicates that the original URL is already stored.
+	ErrFullURLExists = errors.New("full URL already exists")
+	// ErrUniqueShortURL indicates that a unique short ID could not be generated.
 	ErrUniqueShortURL = errors.New("can't create unique short URL")
 )
 
@@ -36,6 +44,7 @@ type lookupJob struct {
 	done     *sync.WaitGroup
 }
 
+// Service implements URL shortening, resolution, listing, and deletion.
 type Service struct {
 	storage             URLStorage
 	maxShortURLAttempts int
@@ -44,6 +53,7 @@ type Service struct {
 	deleteWorkersDone   chan struct{}
 }
 
+// NewService starts the deletion lookup workers and returns a URL service.
 func NewService(storage URLStorage, maxShortURLAttempts int, deleteBatchConcurrency int) Service {
 	workerCount := max(1, deleteBatchConcurrency)
 	s := Service{
@@ -77,11 +87,13 @@ func NewService(storage URLStorage, maxShortURLAttempts int, deleteBatchConcurre
 	return s
 }
 
+// Close stops the deletion lookup workers.
 func (s Service) Close() {
 	close(s.deleteJobs)
 	<-s.deleteWorkersDone
 }
 
+// Shorten stores a URL and returns its short ID; an existing URL returns ErrFullURLExists.
 func (s Service) Shorten(ctx context.Context, fullURL string, userID string) (string, error) {
 	if fullURL == "" {
 		return "", ErrEmptyURL
@@ -103,6 +115,7 @@ func (s Service) Shorten(ctx context.Context, fullURL string, userID string) (st
 	return "", ErrUniqueShortURL
 }
 
+// Resolve returns the original URL for a short ID, including not-found and gone errors.
 func (s Service) Resolve(ctx context.Context, shortURL string) (string, error) {
 	if shortURL == "" {
 		return "", ErrEmptyURL
@@ -120,6 +133,7 @@ func (s Service) Resolve(ctx context.Context, shortURL string) (string, error) {
 	return fullURL, nil
 }
 
+// ShortenBatch stores a batch atomically and preserves each correlation ID.
 func (s Service) ShortenBatch(ctx context.Context, fullURLBatch []*model.OriginalURLRecord, userID string) ([]*model.ShortURLRecord, error) {
 	if len(fullURLBatch) == 0 {
 		return nil, ErrEmptyURLList
@@ -158,6 +172,7 @@ func (s Service) ShortenBatch(ctx context.Context, fullURLBatch []*model.Origina
 	return nil, ErrUniqueShortURL
 }
 
+// GetUserURLs lists the short and original URLs owned by a user.
 func (s Service) GetUserURLs(ctx context.Context, userID string) ([]*model.UserRecord, error) {
 	userURLsList, err := s.storage.GetUserURLs(ctx, userID)
 	if errors.Is(err, repository.ErrUserNotFound) {
@@ -169,6 +184,7 @@ func (s Service) GetUserURLs(ctx context.Context, userID string) ([]*model.UserR
 	return userURLsList, nil
 }
 
+// DeleteBatch marks only the user's URLs as deleted.
 func (s Service) DeleteBatch(ctx context.Context, shortURLList []string, userID string) error {
 	if len(shortURLList) == 0 {
 		return ErrEmptyURLList
@@ -239,12 +255,14 @@ func (s Service) DeleteBatch(ctx context.Context, shortURLList []string, userID 
 	return nil
 }
 
+// DeleteTask identifies URLs to delete on behalf of a user.
 type DeleteTask struct {
 	Context context.Context
 	URLs    []string
 	UserID  string
 }
 
+// ProcessDeleteTasks batches queued deletions by user and reports failures to onError.
 func (s Service) ProcessDeleteTasks(onError func(error), batchSize int, timeout time.Duration, inputs ...<-chan DeleteTask) {
 	if batchSize <= 0 || timeout <= 0 {
 		onError(fmt.Errorf("delete batch size and timeout must be positive"))

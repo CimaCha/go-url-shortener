@@ -10,18 +10,21 @@ import (
 	"go.uber.org/zap"
 )
 
+// Producer holds the observers notified by AuditMiddleware.
 type Producer struct {
 	observers map[string]Observer
 }
 
 type urlKey struct{}
 
+// RecordURL attaches the original URL to the current audited request.
 func RecordURL(ctx context.Context, url string) {
 	if value, ok := ctx.Value(urlKey{}).(*string); ok {
 		*value = url
 	}
 }
 
+// AuditMiddleware sends events after successful shortening or redirect responses.
 func AuditMiddleware(log *zap.Logger, producer Producer, action Action) func(http.Handler) http.Handler {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -57,6 +60,7 @@ func AuditMiddleware(log *zap.Logger, producer Producer, action Action) func(htt
 	}
 }
 
+// Register adds or replaces an observer by its ID.
 func (e *Producer) Register(o Observer) {
 	if e.observers == nil {
 		e.observers = make(map[string]Observer)
@@ -64,6 +68,7 @@ func (e *Producer) Register(o Observer) {
 	e.observers[o.getID()] = o
 }
 
+// Deregister removes an observer by its ID.
 func (e *Producer) Deregister(o Observer) {
 	delete(e.observers, o.getID())
 }

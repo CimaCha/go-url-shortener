@@ -8,14 +8,17 @@ import (
 )
 
 var (
+	// ErrOpenFileForWrite indicates that the audit file could not be opened.
 	ErrOpenFileForWrite = errors.New("open file for write error")
 )
 
+// FileWriteSubscriber appends audit events to a file as JSON lines.
 type FileWriteSubscriber struct {
 	id       string
 	fileName string
 }
 
+// NewFileWriteSubscriber creates a file audit observer with the given ID.
 func NewFileWriteSubscriber(id string, fileName string) *FileWriteSubscriber {
 	return &FileWriteSubscriber{
 		id:       id,

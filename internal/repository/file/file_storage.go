@@ -12,12 +12,14 @@ import (
 	"github.com/CimaCha/go-url-shortener/internal/repository"
 )
 
+// Storage persists URL mappings in a file-backed snapshot.
 type Storage struct {
 	memory *repository.MemoryURLStorage
 	writer *Writer
 	mu     sync.Mutex
 }
 
+// NewFileStorage loads the snapshot at filePath into memory.
 func NewFileStorage(filePath string) (*Storage, error) {
 	reader, err := NewReader(filePath)
 	if err != nil {
@@ -44,6 +46,7 @@ func NewFileStorage(filePath string) (*Storage, error) {
 	}, nil
 }
 
+// SaveShortURL stores one mapping and persists the new snapshot.
 func (f *Storage) SaveShortURL(ctx context.Context, shortURL, fullURL, userID string) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -59,6 +62,7 @@ func (f *Storage) SaveShortURL(ctx context.Context, shortURL, fullURL, userID st
 	return "", nil
 }
 
+// FindFullURL resolves a short ID from the loaded snapshot.
 func (f *Storage) FindFullURL(ctx context.Context, shortURL string) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -66,6 +70,7 @@ func (f *Storage) FindFullURL(ctx context.Context, shortURL string) (string, err
 	return f.memory.FindFullURL(ctx, shortURL)
 }
 
+// SaveShortURLBatch stores all mappings and persists one new snapshot.
 func (f *Storage) SaveShortURLBatch(ctx context.Context, URLRecords []*model.URLRecord, userID string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -81,6 +86,7 @@ func (f *Storage) SaveShortURLBatch(ctx context.Context, URLRecords []*model.URL
 	return nil
 }
 
+// GetUserURLs returns the mappings belonging to a user.
 func (f *Storage) GetUserURLs(ctx context.Context, userID string) ([]*model.UserRecord, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -88,6 +94,7 @@ func (f *Storage) GetUserURLs(ctx context.Context, userID string) ([]*model.User
 	return f.memory.GetUserURLs(ctx, userID)
 }
 
+// GetShortURLData returns ownership and deletion metadata for a short ID.
 func (f *Storage) GetShortURLData(ctx context.Context, shortURL string) (*model.StorageRecord, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -95,6 +102,7 @@ func (f *Storage) GetShortURLData(ctx context.Context, shortURL string) (*model.
 	return f.memory.GetShortURLData(ctx, shortURL)
 }
 
+// DeleteURLsBatch marks the user's URLs as deleted and persists the snapshot.
 func (f *Storage) DeleteURLsBatch(ctx context.Context, shortURLs []string, userID string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
