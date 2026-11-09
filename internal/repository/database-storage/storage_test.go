@@ -156,7 +156,7 @@ func TestStorage(t *testing.T) {
 	}
 }
 
-func newTestDSN(t *testing.T) string {
+func newTestDSN(t testing.TB) string {
 	t.Helper()
 
 	dsn := os.Getenv("TEST_DATABASE_DSN")

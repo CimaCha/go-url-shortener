@@ -1,9 +1,10 @@
 package router
 
 import (
-	"github.com/CimaCha/go-url-shortener/internal/authentication"
 	"net/http"
+	_ "net/http/pprof"
 
+	"github.com/CimaCha/go-url-shortener/internal/authentication"
 	"github.com/CimaCha/go-url-shortener/internal/compression"
 	"github.com/CimaCha/go-url-shortener/internal/logger"
 	"github.com/go-chi/chi/v5"
@@ -27,5 +28,6 @@ func New(log *zap.Logger, jwtBuilder authentication.TokenBuilder, userIDParser a
 	router.Method(http.MethodGet, "/api/user/urls", userURLsHandler)
 	router.With(middleware.AllowContentType("application/json")).
 		Method(http.MethodDelete, "/api/user/urls", deleteURLsHandler)
+	router.Handle("/debug/pprof/*", http.DefaultServeMux)
 	return router
 }

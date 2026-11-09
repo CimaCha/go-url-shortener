@@ -109,6 +109,20 @@ func TestAPIShortenBatchHandler(t *testing.T) {
 			wantBody:        "unexpected end of JSON input\n",
 			wantContentType: "text/plain; charset=utf-8",
 		},
+		{
+			name:            "multiple JSON values",
+			body:            `[] []`,
+			wantStatus:      http.StatusBadRequest,
+			wantBody:        "multiple JSON values\n",
+			wantContentType: "text/plain; charset=utf-8",
+		},
+		{
+			name:            "body exceeds limit",
+			body:            `[{"original_url":"` + strings.Repeat("a", 10<<20) + `"}]`,
+			wantStatus:      http.StatusRequestEntityTooLarge,
+			wantBody:        "request body too large\n",
+			wantContentType: "text/plain; charset=utf-8",
+		},
 	}
 
 	for _, tt := range tests {

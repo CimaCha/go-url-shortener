@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"net/http"
+
 	"github.com/CimaCha/go-url-shortener/internal/authentication"
 	"github.com/CimaCha/go-url-shortener/internal/model"
 	"github.com/CimaCha/go-url-shortener/internal/service"
 	"go.uber.org/zap"
-	"net/http"
 )
 
 //go:generate mockgen -source=handler.go -destination=mocks/mock_user_urls_getter.gen.go -package=mocks
@@ -48,7 +48,7 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		encodedBody := make(model.UserURLsResponse, len(userURLsList))
 		for i, record := range userURLsList {
 			encodedBody[i] = &model.UserRecord{
-				ShortURL:    fmt.Sprintf("%s/%s", h.defaultShortAddress, record.ShortURL),
+				ShortURL:    h.defaultShortAddress + "/" + record.ShortURL,
 				OriginalURL: record.OriginalURL,
 			}
 		}
