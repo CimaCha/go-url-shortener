@@ -92,6 +92,7 @@ func run(log zap.Logger) error {
 	userIDParser := authentication.NewUserIDParser([]byte(cfg.SecretKey))
 
 	producer := audit.Producer{}
+	defer producer.Close()
 
 	if cfg.AuditFile != "" {
 		producer.Register(audit.NewFileWriteSubscriber("file_write_subscriber", cfg.AuditFile))

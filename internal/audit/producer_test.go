@@ -3,7 +3,9 @@ package audit
 import (
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/CimaCha/go-url-shortener/internal/authentication"
 	"github.com/stretchr/testify/require"
@@ -20,6 +22,62 @@ func (o *recordingObserver) update(exposure Exposure) error {
 }
 
 func (*recordingObserver) getID() string { return "test" }
+
+type blockingObserver struct {
+	once    sync.Once
+	started chan struct{}
+	release chan struct{}
+}
+
+func (o *blockingObserver) update(Exposure) error {
+	o.once.Do(func() { close(o.started) })
+	<-o.release
+	return nil
+}
+
+func (*blockingObserver) getID() string { return "blocking" }
+
+func TestAuditMiddlewareDoesNotWaitForObserver(t *testing.T) {
+	observer := &blockingObserver{started: make(chan struct{}), release: make(chan struct{})}
+	producer := Producer{}
+	producer.Register(observer)
+	defer func() {
+		close(observer.release)
+		producer.Close()
+	}()
+	handler := AuditMiddleware(zap.NewNop(), producer, Shorten)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		RecordURL(r.Context(), "https://example.com")
+		w.WriteHeader(http.StatusCreated)
+	}))
+	completed := make(chan struct{})
+	go func() {
+		handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", nil))
+		close(completed)
+	}()
+
+	select {
+	case <-observer.started:
+	case <-time.After(time.Second):
+		t.Fatal("audit observer was not called")
+	}
+	select {
+	case <-completed:
+	case <-time.After(time.Second):
+		t.Fatal("HTTP handler waited for audit observer")
+	}
+	for range cap(producer.state.events) + 1 {
+		completed := make(chan struct{})
+		go func() {
+			handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/", nil))
+			close(completed)
+		}()
+		select {
+		case <-completed:
+		case <-time.After(time.Second):
+			t.Fatal("HTTP handler waited for a full audit queue")
+		}
+	}
+}
 
 func TestAuditMiddlewareOnlyReportsSuccessfulActions(t *testing.T) {
 	tests := []struct {
@@ -52,6 +110,7 @@ func TestAuditMiddlewareOnlyReportsSuccessfulActions(t *testing.T) {
 			response := httptest.NewRecorder()
 
 			handler.ServeHTTP(response, request)
+			producer.Close()
 
 			require.Equal(t, tt.status, response.Code)
 			if !tt.want {
@@ -78,6 +137,7 @@ func TestAuditMiddlewareDoesNotReportRejectedAuthentication(t *testing.T) {
 	response := httptest.NewRecorder()
 
 	handler.ServeHTTP(response, request)
+	producer.Close()
 
 	require.Equal(t, http.StatusUnauthorized, response.Code)
 	require.Empty(t, observer.exposures)

@@ -130,6 +130,7 @@ func TestShortenURLHandlerReportsOriginalURL(t *testing.T) {
 	response := httptest.NewRecorder()
 
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/", strings.NewReader(originalURL)))
+	producer.Close()
 
 	require.Equal(t, http.StatusCreated, response.Code)
 	select {

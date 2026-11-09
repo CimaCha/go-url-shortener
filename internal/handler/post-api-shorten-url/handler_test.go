@@ -144,6 +144,7 @@ func TestAPIShortenURLHandlerReportsOriginalURL(t *testing.T) {
 	response := httptest.NewRecorder()
 
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(`{"url":"https://example.com/path"}`)))
+	producer.Close()
 
 	require.Equal(t, http.StatusCreated, response.Code)
 	select {

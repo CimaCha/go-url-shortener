@@ -20,6 +20,7 @@ func BenchmarkAuditMiddleware(b *testing.B) {
 		b.Run(string(action), func(b *testing.B) {
 			producer := Producer{}
 			producer.Register(benchmarkObserver{})
+			b.Cleanup(producer.Close)
 			status := http.StatusCreated
 			if action == Follow {
 				status = http.StatusTemporaryRedirect

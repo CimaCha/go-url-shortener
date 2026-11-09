@@ -3,6 +3,7 @@ package audit
 import (
 	"context"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/CimaCha/go-url-shortener/internal/authentication"
@@ -12,7 +13,20 @@ import (
 
 // Producer holds the observers notified by AuditMiddleware.
 type Producer struct {
+	state *producerState
+}
+
+type producerState struct {
+	mu        sync.Mutex
 	observers map[string]Observer
+	events    chan auditEvent
+	done      chan struct{}
+	closed    bool
+}
+
+type auditEvent struct {
+	exposure Exposure
+	log      *zap.Logger
 }
 
 type urlKey struct{}
@@ -49,26 +63,85 @@ func AuditMiddleware(log *zap.Logger, producer Producer, action Action) func(htt
 				UserID:    authentication.UserID(request.Context()),
 				URL:       url,
 			}
-			for _, observer := range producer.observers {
-				err := observer.update(exposure)
-				if err != nil {
-					log.Error("error updating observer", zap.Error(err))
-				}
-			}
-
+			producer.enqueue(auditEvent{exposure: exposure, log: log})
 		})
+	}
+}
+
+func (e Producer) enqueue(event auditEvent) {
+	if e.state == nil {
+		return
+	}
+	e.state.mu.Lock()
+	queued := false
+	if !e.state.closed {
+		// shortcut: the bounded queue drops events under sustained overload; use a durable queue if every event must survive.
+		select {
+		case e.state.events <- event:
+			queued = true
+		default:
+		}
+	}
+	e.state.mu.Unlock()
+	if !queued {
+		event.log.Error("audit queue full or closed; event dropped")
 	}
 }
 
 // Register adds or replaces an observer by its ID.
 func (e *Producer) Register(o Observer) {
-	if e.observers == nil {
-		e.observers = make(map[string]Observer)
+	if e.state == nil {
+		e.state = &producerState{
+			observers: make(map[string]Observer),
+			events:    make(chan auditEvent, 256),
+			done:      make(chan struct{}),
+		}
+		go e.run()
 	}
-	e.observers[o.getID()] = o
+	e.state.mu.Lock()
+	defer e.state.mu.Unlock()
+	if !e.state.closed {
+		e.state.observers[o.getID()] = o
+	}
 }
 
 // Deregister removes an observer by its ID.
 func (e *Producer) Deregister(o Observer) {
-	delete(e.observers, o.getID())
+	if e.state == nil {
+		return
+	}
+	e.state.mu.Lock()
+	delete(e.state.observers, o.getID())
+	e.state.mu.Unlock()
+}
+
+// Close drains queued audit events and stops the background worker.
+func (e *Producer) Close() {
+	if e.state == nil {
+		return
+	}
+	e.state.mu.Lock()
+	if !e.state.closed {
+		e.state.closed = true
+		close(e.state.events)
+	}
+	e.state.mu.Unlock()
+	<-e.state.done
+}
+
+func (e *Producer) run() {
+	defer close(e.state.done)
+	for event := range e.state.events {
+		e.state.mu.Lock()
+		observers := make([]Observer, 0, len(e.state.observers))
+		for _, observer := range e.state.observers {
+			observers = append(observers, observer)
+		}
+		e.state.mu.Unlock()
+		for _, observer := range observers {
+			if err := observer.update(event.exposure); err != nil {
+				event.log.Error("error updating observer", zap.Error(err))
+			}
+		}
+	}
 }
