@@ -92,16 +92,25 @@ func run(log zap.Logger) error {
 	userIDParser := authentication.NewUserIDParser([]byte(cfg.SecretKey))
 
 	producer := audit.Producer{}
-	defer producer.Close()
 
 	if cfg.AuditFile != "" {
-		producer.Register(audit.NewFileWriteSubscriber("file_write_subscriber", cfg.AuditFile))
+		fileSubscriber, err := audit.NewFileWriteSubscriber("file_write_subscriber", cfg.AuditFile)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err := fileSubscriber.Close(); err != nil {
+				log.Error("close audit file", zap.Error(err))
+			}
+		}()
+		producer.Register(fileSubscriber)
 	}
 	if cfg.AuditURL != "" {
 		client := gentleman.New()
 		client.Use(timeout.Request(5 * time.Second))
 		producer.Register(audit.NewURLClientSubscriber("client_subscriber", cfg.AuditURL, client))
 	}
+	defer producer.Close()
 	shortenAudit := audit.AuditMiddleware(log.With(zap.String("action", "shorten")), producer, audit.Shorten)
 	followAudit := audit.AuditMiddleware(log.With(zap.String("action", "follow")), producer, audit.Follow)
 

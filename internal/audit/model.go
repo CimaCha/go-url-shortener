@@ -12,8 +12,8 @@ const (
 
 // Exposure is an audit event for a successful URL operation.
 type Exposure struct {
-	Timestamp int64
-	Action    Action
-	UserID    string
-	URL       string
+	Timestamp int64  `json:"ts"`
+	Action    Action `json:"action"`
+	UserID    string `json:"user_id"`
+	URL       string `json:"url"`
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync"
 )
 
 var (
@@ -14,16 +15,18 @@ var (
 
 // FileWriteSubscriber appends audit events to a file as JSON lines.
 type FileWriteSubscriber struct {
-	id       string
-	fileName string
+	id   string
+	mu   sync.Mutex
+	file *os.File
 }
 
 // NewFileWriteSubscriber creates a file audit observer with the given ID.
-func NewFileWriteSubscriber(id string, fileName string) *FileWriteSubscriber {
-	return &FileWriteSubscriber{
-		id:       id,
-		fileName: fileName,
+func NewFileWriteSubscriber(id string, fileName string) (*FileWriteSubscriber, error) {
+	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrOpenFileForWrite, err)
 	}
+	return &FileWriteSubscriber{id: id, file: file}, nil
 }
 
 func (s *FileWriteSubscriber) update(exposure Exposure) error {
@@ -35,20 +38,25 @@ func (s *FileWriteSubscriber) getID() string {
 }
 
 func (s *FileWriteSubscriber) writeAudit(exposure Exposure) error {
-	file, err := os.OpenFile(s.fileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
-	if err != nil {
-		return fmt.Errorf("%w: %w", ErrOpenFileForWrite, err)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.file == nil {
+		return os.ErrClosed
 	}
-	defer file.Close()
-
-	if err = json.NewEncoder(file).Encode(exposure); err != nil {
+	if err := json.NewEncoder(s.file).Encode(exposure); err != nil {
 		return fmt.Errorf("encode exposure: %w", err)
 	}
-	if err = file.Sync(); err != nil {
-		return fmt.Errorf("sync file: %w", err)
-	}
-	if err = file.Close(); err != nil {
-		return fmt.Errorf("close file: %w", err)
-	}
 	return nil
+}
+
+// Close syncs and closes the audit file after all queued events are delivered.
+func (s *FileWriteSubscriber) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.file == nil {
+		return nil
+	}
+	err := errors.Join(s.file.Sync(), s.file.Close())
+	s.file = nil
+	return err
 }

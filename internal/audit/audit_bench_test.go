@@ -47,7 +47,11 @@ func BenchmarkAuditMiddleware(b *testing.B) {
 }
 
 func BenchmarkFileWriteSubscriber(b *testing.B) {
-	subscriber := NewFileWriteSubscriber("file", filepath.Join(b.TempDir(), "audit.json"))
+	subscriber, err := NewFileWriteSubscriber("file", filepath.Join(b.TempDir(), "audit.json"))
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.Cleanup(func() { _ = subscriber.Close() })
 	exposure := Exposure{Timestamp: 1, Action: Shorten, UserID: "user", URL: "https://example.com/item"}
 	b.ReportAllocs()
 	for b.Loop() {

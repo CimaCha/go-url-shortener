@@ -2,6 +2,7 @@ package audit
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -20,8 +21,11 @@ func TestURLClientSubscriberSendsExposure(t *testing.T) {
 		require.Equal(t, "/audit", r.URL.Path)
 		require.Equal(t, "source=shortener", r.URL.RawQuery)
 		require.Equal(t, "application/json", r.Header.Get("Content-Type"))
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		require.Equal(t, "{\"ts\":123,\"action\":\"shorten\",\"user_id\":\"user-1\",\"url\":\"https://example.com\"}\n", string(body))
 		var got Exposure
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&got))
+		require.NoError(t, json.Unmarshal(body, &got))
 		require.Equal(t, want, got)
 		w.WriteHeader(http.StatusNoContent)
 	}))
