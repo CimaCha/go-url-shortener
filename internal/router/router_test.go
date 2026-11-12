@@ -86,6 +86,18 @@ func TestRouter(t *testing.T) {
 	}
 }
 
+func TestRouterDoesNotExposePprof(t *testing.T) {
+	router := New(zap.NewNop(), authentication.JWTBuilder{SecretKey: []byte("test-secret")}, authentication.NewUserIDParser([]byte("test-secret")), http.NotFoundHandler(), http.NotFoundHandler(), http.NotFoundHandler(), http.NotFoundHandler(), http.NotFoundHandler(), http.NotFoundHandler(), http.NotFoundHandler())
+
+	for _, path := range []string{"/debug/pprof/", "/debug/pprof/heap"} {
+		t.Run(path, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+			assert.Equal(t, http.StatusNotFound, response.Code)
+		})
+	}
+}
+
 func gzipRequestBody(t *testing.T, body string) []byte {
 	t.Helper()
 

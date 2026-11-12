@@ -1,5 +1,6 @@
 package model
 
+// FileRecord is one URL entry in the file storage snapshot.
 type FileRecord struct {
 	UUID        string `json:"uuid,omitempty"`
 	ShortURL    string `json:"short_url,omitempty"`

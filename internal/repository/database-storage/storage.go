@@ -15,14 +15,18 @@ import (
 )
 
 var (
-	ErrPingDataBase  = errors.New("failed to ping database")
+	// ErrPingDataBase indicates that the database did not respond to Ping.
+	ErrPingDataBase = errors.New("failed to ping database")
+	// ErrCreateNewPool indicates that a PostgreSQL pool could not be created.
 	ErrCreateNewPool = errors.New("failed to create new pool")
 )
 
+// Storage persists URLs in PostgreSQL through Pool.
 type Storage struct {
 	Pool *pgxpool.Pool
 }
 
+// NewDatabaseStorage opens PostgreSQL, checks connectivity, and applies migrations.
 func NewDatabaseStorage(ctx context.Context, databaseURL string) (*Storage, error) {
 	pool, err := pgxpool.New(ctx, databaseURL)
 	if err != nil {
@@ -42,6 +46,7 @@ func NewDatabaseStorage(ctx context.Context, databaseURL string) (*Storage, erro
 	return &Storage{Pool: pool}, nil
 }
 
+// SaveShortURL inserts a mapping and reports short or original URL conflicts.
 func (s Storage) SaveShortURL(ctx context.Context, shortURL, fullURL, userID string) (string, error) {
 	var storedFullURL string
 	err := s.Pool.QueryRow(ctx, "INSERT INTO urls(short_url, full_url, user_id) VALUES ($1,$2, $3) ON CONFLICT (full_url) DO UPDATE SET full_url=urls.full_url RETURNING urls.short_url;", shortURL, fullURL, userID).Scan(&storedFullURL)
@@ -59,6 +64,7 @@ func (s Storage) SaveShortURL(ctx context.Context, shortURL, fullURL, userID str
 	return "", err
 }
 
+// FindFullURL resolves a short ID unless it is absent or deleted.
 func (s Storage) FindFullURL(ctx context.Context, shortURL string) (string, error) {
 	var fullURL string
 	var deleted bool
@@ -75,14 +81,17 @@ func (s Storage) FindFullURL(ctx context.Context, shortURL string) (string, erro
 	return fullURL, nil
 }
 
+// Close releases the PostgreSQL connection pool.
 func (s Storage) Close() {
 	s.Pool.Close()
 }
 
+// Ping checks connectivity to PostgreSQL.
 func (s Storage) Ping(ctx context.Context) error {
 	return s.Pool.Ping(ctx)
 }
 
+// SaveShortURLBatch inserts a batch in one transaction.
 func (s Storage) SaveShortURLBatch(ctx context.Context, URLRecords []*model.URLRecord, userID string) error {
 	// начинаем транзакцию
 	tx, err := s.Pool.Begin(ctx)
@@ -119,6 +128,7 @@ func (s Storage) SaveShortURLBatch(ctx context.Context, URLRecords []*model.URLR
 	return tx.Commit(ctx)
 }
 
+// GetUserURLs returns the mappings belonging to a user.
 func (s Storage) GetUserURLs(ctx context.Context, userID string) ([]*model.UserRecord, error) {
 	var userRecords []*model.UserRecord
 	rows, err := s.Pool.Query(ctx, "SELECT full_url, short_url FROM urls WHERE user_id = $1", userID)
@@ -142,6 +152,7 @@ func (s Storage) GetUserURLs(ctx context.Context, userID string) ([]*model.UserR
 	return userRecords, nil
 }
 
+// GetShortURLData returns ownership and deletion metadata for a short ID.
 func (s Storage) GetShortURLData(ctx context.Context, shortURL string) (*model.StorageRecord, error) {
 	data := &model.StorageRecord{}
 	err := s.Pool.QueryRow(ctx,
@@ -157,6 +168,7 @@ func (s Storage) GetShortURLData(ctx context.Context, shortURL string) (*model.S
 	return data, nil
 }
 
+// DeleteURLsBatch marks the user's matching short IDs as deleted.
 func (s Storage) DeleteURLsBatch(ctx context.Context, shortURLs []string, userID string) error {
 	_, err := s.Pool.Exec(ctx, "UPDATE urls SET deleted_flag = true WHERE short_url = ANY($1) AND user_id = $2", shortURLs, userID)
 	return err

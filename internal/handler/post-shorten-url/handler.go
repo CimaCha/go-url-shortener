@@ -4,26 +4,31 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/CimaCha/go-url-shortener/internal/authentication"
-	"go.uber.org/zap"
 	"io"
 	"net/http"
 
+	"github.com/CimaCha/go-url-shortener/internal/authentication"
+	"go.uber.org/zap"
+
+	"github.com/CimaCha/go-url-shortener/internal/audit"
 	"github.com/CimaCha/go-url-shortener/internal/service"
 )
 
 //go:generate mockgen -source=handler.go -destination=mocks/mock_url_handler.gen.go -package=mocks
 
+// Shortener creates a short ID for a user's original URL.
 type Shortener interface {
 	Shorten(ctx context.Context, fullURL, userID string) (string, error)
 }
 
+// Handler serves the plain-text shortening endpoint.
 type Handler struct {
 	log                 zap.Logger
 	service             Shortener
 	defaultShortAddress string
 }
 
+// NewShortenURLHandler creates a handler for POST /.
 func NewShortenURLHandler(log zap.Logger, service Shortener, defaultShortAddress string) Handler {
 	return Handler{
 		log:                 log,
@@ -32,6 +37,7 @@ func NewShortenURLHandler(log zap.Logger, service Shortener, defaultShortAddress
 	}
 }
 
+// ServeHTTP reads a URL from plain text and writes its short URL with status 201.
 func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 	body, err := io.ReadAll(req.Body)
@@ -40,7 +46,8 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	url, err := h.service.Shorten(req.Context(), string(body), authentication.UserID(req.Context()))
+	fullURL := string(body)
+	url, err := h.service.Shorten(req.Context(), fullURL, authentication.UserID(req.Context()))
 	if err != nil {
 		if errors.Is(err, service.ErrFullURLExists) {
 			finalURL := fmt.Sprintf("%s/%s", h.defaultShortAddress, url)
@@ -62,6 +69,7 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	audit.RecordURL(req.Context(), fullURL)
 	finalURL := fmt.Sprintf("%s/%s", h.defaultShortAddress, url)
 	res.Header().Set("Content-Type", "text/plain")
 	res.WriteHeader(http.StatusCreated)

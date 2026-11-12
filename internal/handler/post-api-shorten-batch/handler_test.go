@@ -3,13 +3,14 @@ package apishortenbatch
 import (
 	"context"
 	"errors"
-	"github.com/CimaCha/go-url-shortener/internal/authentication"
-	authmocks "github.com/CimaCha/go-url-shortener/internal/authentication/mocks"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/CimaCha/go-url-shortener/internal/authentication"
+	authmocks "github.com/CimaCha/go-url-shortener/internal/authentication/mocks"
 
 	"github.com/CimaCha/go-url-shortener/internal/handler/post-api-shorten-batch/mocks"
 	"github.com/CimaCha/go-url-shortener/internal/model"
@@ -107,6 +108,20 @@ func TestAPIShortenBatchHandler(t *testing.T) {
 			body:            `[`,
 			wantStatus:      http.StatusBadRequest,
 			wantBody:        "unexpected end of JSON input\n",
+			wantContentType: "text/plain; charset=utf-8",
+		},
+		{
+			name:            "multiple JSON values",
+			body:            `[] []`,
+			wantStatus:      http.StatusBadRequest,
+			wantBody:        "multiple JSON values\n",
+			wantContentType: "text/plain; charset=utf-8",
+		},
+		{
+			name:            "body exceeds limit",
+			body:            `[{"original_url":"` + strings.Repeat("a", 10<<20) + `"}]`,
+			wantStatus:      http.StatusRequestEntityTooLarge,
+			wantBody:        "request body too large\n",
 			wantContentType: "text/plain; charset=utf-8",
 		},
 	}

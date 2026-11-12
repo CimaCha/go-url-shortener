@@ -7,15 +7,16 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/CimaCha/go-url-shortener/internal/audit"
 	"github.com/CimaCha/go-url-shortener/internal/authentication"
 	"github.com/CimaCha/go-url-shortener/internal/config"
 	apideletebatch "github.com/CimaCha/go-url-shortener/internal/handler/delete-url-batch"
 	userurls "github.com/CimaCha/go-url-shortener/internal/handler/get-api-user-urls"
-	"github.com/CimaCha/go-url-shortener/internal/handler/get-full-url"
+	fullurl "github.com/CimaCha/go-url-shortener/internal/handler/get-full-url"
 	getping "github.com/CimaCha/go-url-shortener/internal/handler/get-ping"
 	apishortenbatch "github.com/CimaCha/go-url-shortener/internal/handler/post-api-shorten-batch"
 	apishortenurl "github.com/CimaCha/go-url-shortener/internal/handler/post-api-shorten-url"
-	"github.com/CimaCha/go-url-shortener/internal/handler/post-shorten-url"
+	shortenurl "github.com/CimaCha/go-url-shortener/internal/handler/post-shorten-url"
 	"github.com/CimaCha/go-url-shortener/internal/logger"
 	"github.com/CimaCha/go-url-shortener/internal/repository"
 	databasestorage "github.com/CimaCha/go-url-shortener/internal/repository/database-storage"
@@ -23,6 +24,8 @@ import (
 	shortenerrouter "github.com/CimaCha/go-url-shortener/internal/router"
 	"github.com/CimaCha/go-url-shortener/internal/service"
 	"go.uber.org/zap"
+	"gopkg.in/h2non/gentleman.v2"
+	"gopkg.in/h2non/gentleman.v2/plugins/timeout"
 )
 
 func main() {
@@ -88,13 +91,36 @@ func run(log zap.Logger) error {
 	jwtBuilder := authentication.NewJWTBuilder([]byte(cfg.SecretKey))
 	userIDParser := authentication.NewUserIDParser([]byte(cfg.SecretKey))
 
+	producer := audit.Producer{}
+
+	if cfg.AuditFile != "" {
+		fileSubscriber, err := audit.NewFileWriteSubscriber("file_write_subscriber", cfg.AuditFile)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err := fileSubscriber.Close(); err != nil {
+				log.Error("close audit file", zap.Error(err))
+			}
+		}()
+		producer.Register(fileSubscriber)
+	}
+	if cfg.AuditURL != "" {
+		client := gentleman.New()
+		client.Use(timeout.Request(5 * time.Second))
+		producer.Register(audit.NewURLClientSubscriber("client_subscriber", cfg.AuditURL, client))
+	}
+	defer producer.Close()
+	shortenAudit := audit.AuditMiddleware(log.With(zap.String("action", "shorten")), producer, audit.Shorten)
+	followAudit := audit.AuditMiddleware(log.With(zap.String("action", "follow")), producer, audit.Follow)
+
 	router := shortenerrouter.New(
 		log.With(zap.String("layer", "router")),
 		jwtBuilder,
 		userIDParser,
-		shortenURLHandler,
-		apiShortenURLHandler,
-		getFullURLHandler,
+		shortenAudit(shortenURLHandler),
+		shortenAudit(apiShortenURLHandler),
+		followAudit(getFullURLHandler),
 		pingHandler,
 		apiShortenBatchHandler,
 		userURLsHandler,

@@ -2,10 +2,11 @@ package config
 
 import (
 	"flag"
-	"github.com/stretchr/testify/require"
 	"io"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestNew(t *testing.T) {
@@ -131,4 +132,14 @@ func TestNumericConfig(t *testing.T) {
 		_, err := New()
 		require.Error(t, err)
 	})
+}
+
+func TestAuditURLConfig(t *testing.T) {
+	isolateConfig(t, []string{"--audit-url", "http://cli.example/audit"})
+	t.Setenv("AUDIT_URL", "http://env.example/audit")
+
+	cfg, err := New()
+
+	require.NoError(t, err)
+	require.Equal(t, "http://env.example/audit", cfg.AuditURL)
 }

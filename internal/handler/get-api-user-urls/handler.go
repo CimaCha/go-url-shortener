@@ -4,30 +4,34 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"net/http"
+
 	"github.com/CimaCha/go-url-shortener/internal/authentication"
 	"github.com/CimaCha/go-url-shortener/internal/model"
 	"github.com/CimaCha/go-url-shortener/internal/service"
 	"go.uber.org/zap"
-	"net/http"
 )
 
 //go:generate mockgen -source=handler.go -destination=mocks/mock_user_urls_getter.gen.go -package=mocks
 
+// Getter lists the URLs owned by a user.
 type Getter interface {
 	GetUserURLs(ctx context.Context, userID string) ([]*model.UserRecord, error)
 }
 
+// NewHandler creates a handler for GET /api/user/urls.
 func NewHandler(log zap.Logger, service Getter, defaultShortAddress string) Handler {
 	return Handler{log: log, service: service, defaultShortAddress: defaultShortAddress}
 }
 
+// Handler serves the authenticated user's URL list.
 type Handler struct {
 	log                 zap.Logger
 	service             Getter
 	defaultShortAddress string
 }
 
+// ServeHTTP returns the user's URLs as JSON, or status 204 when none exist.
 func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 	userID := authentication.UserID(req.Context())
@@ -48,7 +52,7 @@ func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		encodedBody := make(model.UserURLsResponse, len(userURLsList))
 		for i, record := range userURLsList {
 			encodedBody[i] = &model.UserRecord{
-				ShortURL:    fmt.Sprintf("%s/%s", h.defaultShortAddress, record.ShortURL),
+				ShortURL:    h.defaultShortAddress + "/" + record.ShortURL,
 				OriginalURL: record.OriginalURL,
 			}
 		}

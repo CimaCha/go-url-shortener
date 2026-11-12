@@ -3,12 +3,14 @@ package config
 import (
 	"flag"
 	"fmt"
-	"github.com/caarlos0/env/v11"
 	"math"
 	"os"
 	"time"
+
+	"github.com/caarlos0/env/v11"
 )
 
+// Config holds server settings from command-line flags and environment variables.
 type Config struct {
 	Address                string `env:"SERVER_ADDRESS"`
 	BasicShortenAddress    string `env:"BASE_URL"`
@@ -19,8 +21,11 @@ type Config struct {
 	DeleteBatchConcurrency int    `env:"DELETE_BATCH_CONCURRENCY"`
 	DeleteBatchSize        int    `env:"DELETE_BATCH_SIZE"`
 	DeletionTimeout        int    `env:"DELETION_TIMEOUT"`
+	AuditFile              string `env:"AUDIT_FILE"`
+	AuditURL               string `env:"AUDIT_URL"`
 }
 
+// New parses configuration and rejects invalid batch and timeout settings.
 func New() (*Config, error) {
 	address := flag.String("a", "localhost:8080", "address of service")
 	baseURL := flag.String("b", "http://localhost:8080", "basic address for short url")
@@ -31,6 +36,8 @@ func New() (*Config, error) {
 	deleteBatchConcurrency := flag.Int("c", 10, "delete batch concurrency")
 	deleteBatchSize := flag.Int("db", 100, "delete batch size")
 	deletionTimeout := flag.Int("dt", 10, "deletion timeout in seconds")
+	auditFile := flag.String("audit-file", "", "path to the audit log file")
+	auditURL := flag.String("audit-url", "", "url for audit log")
 	if err := flag.CommandLine.Parse(os.Args[1:]); err != nil {
 		return nil, err
 	}
@@ -45,6 +52,8 @@ func New() (*Config, error) {
 		DeleteBatchConcurrency: *deleteBatchConcurrency,
 		DeleteBatchSize:        *deleteBatchSize,
 		DeletionTimeout:        *deletionTimeout,
+		AuditFile:              *auditFile,
+		AuditURL:               *auditURL,
 	}
 	if err := env.Parse(&config); err != nil {
 		return nil, err

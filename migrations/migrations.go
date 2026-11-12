@@ -16,6 +16,7 @@ import (
 //go:embed *.sql
 var files embed.FS
 
+// Up applies embedded SQL migrations to the PostgreSQL pool.
 func Up(ctx context.Context, pool *pgxpool.Pool) (err error) {
 	return up(ctx, pool, files)
 }

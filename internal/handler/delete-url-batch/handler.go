@@ -14,16 +14,19 @@ import (
 
 //go:generate mockgen -source=handler.go -destination=mocks/mock_deleter.gen.go -package=mocks
 
+// Deleter consumes queued URL deletion tasks.
 type Deleter interface {
 	ProcessDeleteTasks(onError func(error), batchSize int, timeout time.Duration, inputs ...<-chan service.DeleteTask)
 }
 
+// Handler queues deletion requests for asynchronous processing.
 type Handler struct {
 	log  zap.Logger
 	jobs chan service.DeleteTask
 	done chan struct{}
 }
 
+// NewAPIDeleteBatchHandler starts a worker for DELETE /api/user/urls.
 func NewAPIDeleteBatchHandler(log zap.Logger, deleter Deleter, batchSize int, timeout time.Duration) Handler {
 	h := Handler{log: log, jobs: make(chan service.DeleteTask, 100), done: make(chan struct{})}
 	go func() {
@@ -35,11 +38,13 @@ func NewAPIDeleteBatchHandler(log zap.Logger, deleter Deleter, batchSize int, ti
 	return h
 }
 
+// Close drains the deletion queue and waits for the worker to stop.
 func (h Handler) Close() {
 	close(h.jobs)
 	<-h.done
 }
 
+// ServeHTTP accepts a JSON array of short URLs and responds with status 202.
 func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	var decodedBody []string
 	body, err := io.ReadAll(req.Body)

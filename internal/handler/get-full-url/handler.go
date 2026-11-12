@@ -3,8 +3,9 @@ package fullurl
 import (
 	"context"
 	"errors"
-	"go.uber.org/zap"
 	"net/http"
+
+	"go.uber.org/zap"
 
 	"github.com/CimaCha/go-url-shortener/internal/service"
 	"github.com/go-chi/chi/v5"
@@ -12,21 +13,26 @@ import (
 
 //go:generate mockgen -source=handler.go -destination=mocks/mock_url_handler.gen.go -package=mocks
 
+// Resolver finds the original URL for a short ID.
 type Resolver interface {
 	Resolve(ctx context.Context, shortURL string) (string, error)
 }
 
+// Handler serves redirects from short URLs.
 type Handler struct {
 	log     zap.Logger
 	service Resolver
 }
 
+// NewGetFullURLHandler creates a handler for GET /{id}.
 func NewGetFullURLHandler(log zap.Logger, service Resolver) Handler {
 	return Handler{
 		log:     log,
-		service: service}
+		service: service,
+	}
 }
 
+// ServeHTTP redirects to the original URL with status 307.
 func (h Handler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 	id := chi.URLParam(req, "id")
