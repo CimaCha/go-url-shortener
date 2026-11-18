@@ -268,6 +268,7 @@ func emitReset(output *strings.Builder, expression string, t types.Type, package
 	}
 	switch underlying := types.Unalias(t).Underlying().(type) {
 	case *types.Slice:
+		fmt.Fprintf(output, "clear(%s)\n", expression)
 		fmt.Fprintf(output, "%s = %s[:0]\n", expression, expression)
 		return
 	case *types.Map:
