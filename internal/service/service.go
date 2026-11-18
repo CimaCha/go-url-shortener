@@ -143,7 +143,6 @@ func (s Service) ShortenBatch(ctx context.Context, fullURLBatch []*model.Origina
 			return nil, ErrEmptyURL
 		}
 	}
-
 	for range s.maxShortURLAttempts {
 		URLRecords := make([]*model.URLRecord, 0, len(fullURLBatch))
 		shortURLRecords := make([]*model.ShortURLRecord, 0, len(fullURLBatch))

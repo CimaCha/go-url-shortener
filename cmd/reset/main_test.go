@@ -59,6 +59,7 @@ func TestReset(t *testing.T) {
 	r.Reset()
 	if r.Count != 0 || r.Name != "" || r.Ready || n != 0 || r.Child.Count != 0 || r.ChildP.Count != 0 || r.EmptyP != nil || r.Other.Flag { t.Fatal("scalar or nested value was not reset") }
 	if len(r.Names) != 0 || r.Names == nil || &r.Names[:cap(r.Names)][0] != &namesData[0] { t.Fatal("slice backing storage was lost") }
+	if namesData[0] != "" || plainNames[0] != "" { t.Fatal("reset retained slice values") }
 	if len(names) != 0 || names == nil || len(r.Values) != 0 || r.Values == nil || len(values) != 0 { t.Fatal("collection was not retained and cleared") }
 	if r.PlainP.Count != 0 || len(r.PlainP.Names) != 0 || r.PlainP.Names == nil || &r.PlainP.Names[:cap(r.PlainP.Names)][0] != &plainNames[0] || len(r.PlainP.Values) != 0 || r.PlainP.Values == nil { t.Fatal("plain nested struct was not reset recursively") }
 	mapData["new"] = 2
