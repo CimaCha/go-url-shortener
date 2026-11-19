@@ -28,6 +28,7 @@ type Record struct {
 	Names []string
 	Values map[string]int
 	CountP *int
+	Err *error
 	NamesP *[]string
 	ValuesP *map[string]int
 	Child Child
@@ -45,19 +46,21 @@ type Box[T any] struct { Value T; Items []T }
 	writeTestFile(t, root, "sample/sample_test.go", `package sample
 
 import (
+	"os"
 	"testing"
 	"example.com/resetfixture/other"
 )
 
 func TestReset(t *testing.T) {
 	n := 4
+	var sentinel error = os.ErrNotExist
 	names := []string{"a", "b"}
 	values := map[string]int{"a": 1}
-	r := &Record{Count: 3, Name: "x", Ready: true, Names: []string{"x"}, Values: map[string]int{"x": 1}, CountP: &n, NamesP: &names, ValuesP: &values, Child: Child{Count: 1}, ChildP: &Child{Count: 2}, PlainP: &Plain{Count: 3, Names: []string{"x"}, Values: map[string]int{"x": 1}}, Other: other.Value{Flag: true}}
+	r := &Record{Count: 3, Name: "x", Ready: true, Names: []string{"x"}, Values: map[string]int{"x": 1}, CountP: &n, Err: &sentinel, NamesP: &names, ValuesP: &values, Child: Child{Count: 1}, ChildP: &Child{Count: 2}, PlainP: &Plain{Count: 3, Names: []string{"x"}, Values: map[string]int{"x": 1}}, Other: other.Value{Flag: true}}
 	namesData, mapData := r.Names, r.Values
 	plainNames := r.PlainP.Names
 	r.Reset()
-	if r.Count != 0 || r.Name != "" || r.Ready || n != 0 || r.Child.Count != 0 || r.ChildP.Count != 0 || r.EmptyP != nil || r.Other.Flag { t.Fatal("scalar or nested value was not reset") }
+	if r.Count != 0 || r.Name != "" || r.Ready || n != 0 || sentinel != nil || r.Child.Count != 0 || r.ChildP.Count != 0 || r.EmptyP != nil || r.Other.Flag { t.Fatal("scalar or nested value was not reset") }
 	if len(r.Names) != 0 || r.Names == nil || &r.Names[:cap(r.Names)][0] != &namesData[0] { t.Fatal("slice backing storage was lost") }
 	if namesData[0] != "" || plainNames[0] != "" { t.Fatal("reset retained slice values") }
 	if len(names) != 0 || names == nil || len(r.Values) != 0 || r.Values == nil || len(values) != 0 { t.Fatal("collection was not retained and cleared") }

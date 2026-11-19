@@ -23,6 +23,14 @@ type resetType struct {
 	named *types.Named
 }
 
+type resetEmitter struct {
+	output      *strings.Builder
+	packagePath string
+	marked      map[string]bool
+	seen        map[types.Type]bool
+	needsZero   bool
+}
+
 func main() {
 	root, err := os.Getwd()
 	if err != nil {
@@ -34,6 +42,49 @@ func main() {
 }
 
 func generate(root string) error {
+	overlay, err := generatedOverlay(root)
+	if err != nil {
+		return err
+	}
+	loadedDirs, err := addResetStubs(root, overlay)
+	if err != nil {
+		return err
+	}
+	loaded, err := packages.Load(&packages.Config{
+		Dir: root, Mode: packages.NeedName | packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedFiles,
+		BuildFlags: []string{"-mod=mod"},
+		Overlay:    overlay,
+	}, "./...")
+	if err != nil {
+		return err
+	}
+	marked, byPackage, err := collectResetTypes(loaded)
+	if err != nil {
+		return err
+	}
+	activeFiles := make(map[string]bool)
+	for pkg, structs := range byPackage {
+		formatted, err := renderResetFile(pkg, structs, marked)
+		if err != nil {
+			return err
+		}
+		path := filepath.Join(filepath.Dir(pkg.GoFiles[0]), "reset.gen.go")
+		activeFiles[path] = true
+		if err := writeIfChanged(path, formatted); err != nil {
+			return err
+		}
+	}
+	for path := range overlay {
+		if loadedDirs[filepath.Dir(path)] && !activeFiles[path] {
+			if err := os.Remove(path); err != nil {
+				return fmt.Errorf("remove stale %s: %w", path, err)
+			}
+		}
+	}
+	return nil
+}
+
+func generatedOverlay(root string) (map[string][]byte, error) {
 	overlay := make(map[string][]byte)
 	if err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
@@ -62,20 +113,24 @@ func generate(root string) error {
 		overlay[path] = []byte("package " + file.Name.Name + "\n")
 		return nil
 	}); err != nil {
-		return err
+		return nil, err
 	}
+	return overlay, nil
+}
+
+func addResetStubs(root string, overlay map[string][]byte) (map[string]bool, error) {
 	listed, err := packages.Load(&packages.Config{
 		Dir: root, Mode: packages.NeedName | packages.NeedFiles,
 		BuildFlags: []string{"-mod=mod"},
 		Overlay:    overlay,
 	}, "./...")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	loadedDirs := make(map[string]bool)
 	for _, pkg := range listed {
 		for _, loadErr := range pkg.Errors {
-			return fmt.Errorf("list %s: %s", pkg.PkgPath, loadErr)
+			return nil, fmt.Errorf("list %s: %s", pkg.PkgPath, loadErr)
 		}
 		if len(pkg.GoFiles) == 0 {
 			continue
@@ -90,132 +145,98 @@ func generate(root string) error {
 			}
 			file, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ParseComments)
 			if err != nil {
-				return fmt.Errorf("parse %s: %w", path, err)
+				return nil, fmt.Errorf("parse %s: %w", path, err)
 			}
-			for _, declaration := range file.Decls {
-				general, ok := declaration.(*ast.GenDecl)
-				if !ok || general.Tok != token.TYPE {
-					continue
-				}
-				for _, declaration := range general.Specs {
-					spec, ok := declaration.(*ast.TypeSpec)
-					if !ok {
-						continue
-					}
-					if _, ok := spec.Type.(*ast.StructType); !ok || !hasResetMarker(spec.Doc) && !hasResetMarker(general.Doc) {
-						continue
-					}
-					parameters := ""
-					if spec.TypeParams != nil {
-						var names []string
-						for _, field := range spec.TypeParams.List {
-							for _, name := range field.Names {
-								names = append(names, name.Name)
-							}
+			for _, spec := range markedStructs(file) {
+				parameters := ""
+				if spec.TypeParams != nil {
+					var names []string
+					for _, field := range spec.TypeParams.List {
+						for _, name := range field.Names {
+							names = append(names, name.Name)
 						}
-						parameters = "[" + strings.Join(names, ", ") + "]"
 					}
-					fmt.Fprintf(&stubs, "func (_ *%s%s) Reset() {}\n", spec.Name.Name, parameters)
+					parameters = "[" + strings.Join(names, ", ") + "]"
 				}
+				fmt.Fprintf(&stubs, "func (_ *%s%s) Reset() {}\n", spec.Name.Name, parameters)
 			}
 		}
 		if stubs.Len() > len("package "+pkg.Name+"\n") {
 			overlay[filepath.Join(dir, "reset.gen.go")] = []byte(stubs.String())
 		}
 	}
-	loaded, err := packages.Load(&packages.Config{
-		Dir: root, Mode: packages.NeedName | packages.NeedSyntax | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedFiles,
-		BuildFlags: []string{"-mod=mod"},
-		Overlay:    overlay,
-	}, "./...")
-	if err != nil {
-		return err
-	}
+	return loadedDirs, nil
+}
+
+func collectResetTypes(loaded []*packages.Package) (map[string]bool, map[*packages.Package][]resetType, error) {
 	marked := make(map[string]bool)
 	byPackage := make(map[*packages.Package][]resetType)
-	activeFiles := make(map[string]bool)
 	for _, pkg := range loaded {
 		for _, loadErr := range pkg.Errors {
-			return fmt.Errorf("load %s: %s", pkg.PkgPath, loadErr)
+			return nil, nil, fmt.Errorf("load %s: %s", pkg.PkgPath, loadErr)
 		}
 		for _, file := range pkg.Syntax {
-			for _, declaration := range file.Decls {
-				general, ok := declaration.(*ast.GenDecl)
-				if !ok || general.Tok.String() != "type" {
-					continue
+			for _, spec := range markedStructs(file) {
+				object, ok := pkg.TypesInfo.Defs[spec.Name].(*types.TypeName)
+				if !ok {
+					return nil, nil, fmt.Errorf("resolve %s.%s", pkg.PkgPath, spec.Name.Name)
 				}
-				for _, declaration := range general.Specs {
-					spec, ok := declaration.(*ast.TypeSpec)
-					if !ok {
-						continue
-					}
-					if _, ok := spec.Type.(*ast.StructType); !ok || !hasResetMarker(spec.Doc) && !hasResetMarker(general.Doc) {
-						continue
-					}
-					object, ok := pkg.TypesInfo.Defs[spec.Name].(*types.TypeName)
-					if !ok {
-						return fmt.Errorf("resolve %s.%s", pkg.PkgPath, spec.Name.Name)
-					}
-					named, ok := object.Type().(*types.Named)
-					if !ok {
-						return fmt.Errorf("resolve type %s.%s", pkg.PkgPath, spec.Name.Name)
-					}
-					byPackage[pkg] = append(byPackage[pkg], resetType{name: spec.Name.Name, named: named})
-					marked[typeKey(named)] = true
+				named, ok := object.Type().(*types.Named)
+				if !ok {
+					return nil, nil, fmt.Errorf("resolve type %s.%s", pkg.PkgPath, spec.Name.Name)
 				}
+				byPackage[pkg] = append(byPackage[pkg], resetType{name: spec.Name.Name, named: named})
+				marked[typeKey(named)] = true
 			}
 		}
 	}
-	for pkg, structs := range byPackage {
-		var output strings.Builder
-		fmt.Fprintf(&output, "// Code generated by cmd/reset. DO NOT EDIT.\n\npackage %s\n", pkg.Name)
-		needsZero := false
-		for _, item := range structs {
-			parameters := ""
-			if params := item.named.TypeParams(); params != nil && params.Len() > 0 {
-				names := make([]string, params.Len())
-				for i := range names {
-					names[i] = params.At(i).Obj().Name()
-				}
-				parameters = "[" + strings.Join(names, ", ") + "]"
+	return marked, byPackage, nil
+}
+
+func renderResetFile(pkg *packages.Package, structs []resetType, marked map[string]bool) ([]byte, error) {
+	var output strings.Builder
+	fmt.Fprintf(&output, "// Code generated by cmd/reset. DO NOT EDIT.\n\npackage %s\n", pkg.Name)
+	emitter := resetEmitter{output: &output, packagePath: pkg.PkgPath, marked: marked, seen: make(map[types.Type]bool)}
+	for _, item := range structs {
+		parameters := ""
+		if params := item.named.TypeParams(); params != nil && params.Len() > 0 {
+			names := make([]string, params.Len())
+			for i := range names {
+				names[i] = params.At(i).Obj().Name()
 			}
-			fmt.Fprintf(&output, "\nfunc (value *%s%s) Reset() {\nif value == nil { return }\n", item.name, parameters)
-			fields := item.named.Underlying().(*types.Struct)
-			for i := 0; i < fields.NumFields(); i++ {
-				field := fields.Field(i)
-				if field.Name() == "_" {
-					continue
-				}
-				emitReset(&output, "value."+field.Name(), field.Type(), pkg.PkgPath, marked, make(map[types.Type]bool), &needsZero)
+			parameters = "[" + strings.Join(names, ", ") + "]"
+		}
+		fmt.Fprintf(&output, "\nfunc (value *%s%s) Reset() {\nif value == nil { return }\n", item.name, parameters)
+		fields := item.named.Underlying().(*types.Struct)
+		for i := 0; i < fields.NumFields(); i++ {
+			field := fields.Field(i)
+			if field.Name() == "_" {
+				continue
 			}
-			output.WriteString("}\n")
+			emitter.emit("value."+field.Name(), field.Type())
 		}
-		if needsZero {
-			output.WriteString("\nfunc resetGeneratedZero[T any](value *T) { var zero T; *value = zero }\n")
-		}
-		formatted, err := format.Source([]byte(output.String()))
-		if err != nil {
-			return fmt.Errorf("format %s: %w", pkg.PkgPath, err)
-		}
-		path := filepath.Join(filepath.Dir(pkg.GoFiles[0]), "reset.gen.go")
-		activeFiles[path] = true
-		previous, err := os.ReadFile(path)
-		if err == nil && bytes.Equal(previous, formatted) {
-			continue
-		}
-		if err != nil && !os.IsNotExist(err) {
-			return err
-		}
-		if err := os.WriteFile(path, formatted, 0o644); err != nil {
-			return fmt.Errorf("write %s: %w", path, err)
-		}
+		output.WriteString("}\n")
 	}
-	for path := range overlay {
-		if loadedDirs[filepath.Dir(path)] && !activeFiles[path] {
-			if err := os.Remove(path); err != nil {
-				return fmt.Errorf("remove stale %s: %w", path, err)
-			}
-		}
+	if emitter.needsZero {
+		output.WriteString("\nfunc resetGeneratedZero[T any](value *T) { var zero T; *value = zero }\n")
+	}
+	formatted, err := format.Source([]byte(output.String()))
+	if err != nil {
+		return nil, fmt.Errorf("format %s: %w", pkg.PkgPath, err)
+	}
+	return formatted, nil
+}
+
+func writeIfChanged(path string, content []byte) error {
+	previous, err := os.ReadFile(path)
+	if err == nil && bytes.Equal(previous, content) {
+		return nil
+	}
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if err := os.WriteFile(path, content, 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", path, err)
 	}
 	return nil
 }
@@ -232,16 +253,39 @@ func hasResetMarker(group *ast.CommentGroup) bool {
 	return false
 }
 
-func typeKey(named *types.Named) string {
-	return named.Obj().Pkg().Path() + "." + named.Obj().Name()
+func markedStructs(file *ast.File) []*ast.TypeSpec {
+	var specs []*ast.TypeSpec
+	for _, declaration := range file.Decls {
+		general, ok := declaration.(*ast.GenDecl)
+		if !ok || general.Tok != token.TYPE {
+			continue
+		}
+		for _, declaration := range general.Specs {
+			spec, ok := declaration.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+			if _, ok := spec.Type.(*ast.StructType); ok && (hasResetMarker(spec.Doc) || hasResetMarker(general.Doc)) {
+				specs = append(specs, spec)
+			}
+		}
+	}
+	return specs
 }
 
-func hasResetMethod(t types.Type, marked map[string]bool) bool {
-	if named, ok := types.Unalias(t).(*types.Named); ok && marked[typeKey(named)] {
+func typeKey(named *types.Named) string {
+	if pkg := named.Obj().Pkg(); pkg != nil {
+		return pkg.Path() + "." + named.Obj().Name()
+	}
+	return "" // Predeclared types cannot have a reset marker.
+}
+
+func (e *resetEmitter) hasResetMethod(t types.Type) bool {
+	if named, ok := types.Unalias(t).(*types.Named); ok && e.marked[typeKey(named)] {
 		return true
 	}
 	if pointer, ok := types.Unalias(t).(*types.Pointer); ok {
-		if named, ok := types.Unalias(pointer.Elem()).(*types.Named); ok && marked[typeKey(named)] {
+		if named, ok := types.Unalias(pointer.Elem()).(*types.Named); ok && e.marked[typeKey(named)] {
 			return true
 		}
 	}
@@ -255,54 +299,54 @@ func hasResetMethod(t types.Type, marked map[string]bool) bool {
 	return false
 }
 
-func emitReset(output *strings.Builder, expression string, t types.Type, packagePath string, marked map[string]bool, seen map[types.Type]bool, needsZero *bool) {
+func (e *resetEmitter) emit(expression string, t types.Type) {
 	if pointer, ok := types.Unalias(t).(*types.Pointer); ok {
-		fmt.Fprintf(output, "if %s != nil {\n", expression)
-		if hasResetMethod(t, marked) {
-			fmt.Fprintf(output, "%s.Reset()\n", expression)
+		fmt.Fprintf(e.output, "if %s != nil {\n", expression)
+		if e.hasResetMethod(t) {
+			fmt.Fprintf(e.output, "%s.Reset()\n", expression)
 		} else {
-			emitReset(output, "(*"+expression+")", pointer.Elem(), packagePath, marked, seen, needsZero)
+			e.emit("(*"+expression+")", pointer.Elem())
 		}
-		output.WriteString("}\n")
+		e.output.WriteString("}\n")
 		return
 	}
 	switch underlying := types.Unalias(t).Underlying().(type) {
 	case *types.Slice:
-		fmt.Fprintf(output, "clear(%s)\n", expression)
-		fmt.Fprintf(output, "%s = %s[:0]\n", expression, expression)
+		fmt.Fprintf(e.output, "clear(%s)\n", expression)
+		fmt.Fprintf(e.output, "%s = %s[:0]\n", expression, expression)
 		return
 	case *types.Map:
-		fmt.Fprintf(output, "clear(%s)\n", expression)
+		fmt.Fprintf(e.output, "clear(%s)\n", expression)
 		return
 	case *types.Struct:
-		if hasResetMethod(t, marked) || hasResetMethod(types.NewPointer(t), marked) {
-			fmt.Fprintf(output, "%s.Reset()\n", expression)
+		if e.hasResetMethod(t) || e.hasResetMethod(types.NewPointer(t)) {
+			fmt.Fprintf(e.output, "%s.Reset()\n", expression)
 			return
 		}
-		if !seen[t] {
+		if !e.seen[t] {
 			accessible := true
 			for i := 0; i < underlying.NumFields(); i++ {
 				field := underlying.Field(i)
-				if !field.Exported() && field.Pkg() != nil && field.Pkg().Path() != packagePath {
+				if !field.Exported() && field.Pkg() != nil && field.Pkg().Path() != e.packagePath {
 					accessible = false
 					break
 				}
 			}
 			if accessible {
-				seen[t] = true
+				e.seen[t] = true
 				for i := 0; i < underlying.NumFields(); i++ {
 					field := underlying.Field(i)
 					if field.Name() != "_" {
-						emitReset(output, expression+"."+field.Name(), field.Type(), packagePath, marked, seen, needsZero)
+						e.emit(expression+"."+field.Name(), field.Type())
 					}
 				}
-				delete(seen, t)
+				delete(e.seen, t)
 				return
 			}
 		}
 		// shortcut: inaccessible or cyclic nested structs are zeroed as a whole; add Reset to preserve their collections.
 	default:
 	}
-	fmt.Fprintf(output, "resetGeneratedZero(&%s)\n", expression)
-	*needsZero = true
+	fmt.Fprintf(e.output, "resetGeneratedZero(&%s)\n", expression)
+	e.needsZero = true
 }

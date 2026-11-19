@@ -45,8 +45,8 @@ var exitCheckAnalyzer = &analysis.Analyzer{
 					if name == nil {
 						return true
 					}
-					function, ok := pass.TypesInfo.Uses[name].(*types.Func)
-					if ok && function.Pkg() != nil && function.Pkg().Path() == "os" && function.Name() == "Exit" {
+					calledFunc, ok := pass.TypesInfo.Uses[name].(*types.Func)
+					if ok && calledFunc.Pkg() != nil && calledFunc.Pkg().Path() == "os" && calledFunc.Name() == "Exit" {
 						pass.Reportf(call.Pos(), "direct call to os.Exit from main")
 					}
 					return true
