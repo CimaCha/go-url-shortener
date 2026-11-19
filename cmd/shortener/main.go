@@ -3,8 +3,11 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/CimaCha/go-url-shortener/internal/audit"
@@ -28,7 +31,13 @@ import (
 	"gopkg.in/h2non/gentleman.v2/plugins/timeout"
 )
 
+var buildVersion string
+var buildDate string
+var buildCommit string
+
 func main() {
+	printBuildInfo(os.Stdout)
+
 	initializedLogger, err := logger.Initialize("debug")
 	if err != nil {
 		log.Fatal("logger initialization error", err.Error())
@@ -37,6 +46,19 @@ func main() {
 
 	if err = run(*initializedLogger); err != nil {
 		initializedLogger.Fatal("application stopped", zap.Error(err))
+	}
+}
+
+func printBuildInfo(w io.Writer) {
+	for _, field := range []struct{ label, value string }{
+		{"Build version", buildVersion},
+		{"Build date", buildDate},
+		{"Build commit", buildCommit},
+	} {
+		if field.value == "" {
+			field.value = "N/A"
+		}
+		fmt.Fprintf(w, "%s: %s\n", field.label, field.value)
 	}
 }
 
