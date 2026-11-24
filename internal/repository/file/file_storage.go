@@ -3,14 +3,23 @@ package file
 import (
 	"context"
 	"fmt"
-	"maps"
 	"slices"
 	"strconv"
 	"sync"
 
 	"github.com/CimaCha/go-url-shortener/internal/model"
 	"github.com/CimaCha/go-url-shortener/internal/repository"
+	"github.com/CimaCha/go-url-shortener/pkg/pool"
 )
+
+// generate:reset
+type snapshotBuffer struct {
+	keys     []string
+	records  []model.FileRecord
+	pointers []*model.FileRecord
+}
+
+var snapshotBuffers = pool.New(func() *snapshotBuffer { return &snapshotBuffer{} })
 
 // Storage persists URL mappings in a file-backed snapshot.
 type Storage struct {
@@ -120,17 +129,24 @@ func (f *Storage) DeleteURLsBatch(ctx context.Context, shortURLs []string, userI
 
 func (f *Storage) persist(memory *repository.MemoryURLStorage) error {
 	urls := memory.Snapshot()
-	shortURLs := slices.Sorted(maps.Keys(urls))
-	records := make([]*model.FileRecord, 0, len(urls))
-	for uuid, shortURL := range shortURLs {
+	buffer := snapshotBuffers.Get()
+	defer snapshotBuffers.Put(buffer)
+	for shortURL := range urls {
+		buffer.keys = append(buffer.keys, shortURL)
+	}
+	slices.Sort(buffer.keys)
+	buffer.records = slices.Grow(buffer.records, len(buffer.keys))[:len(buffer.keys)]
+	buffer.pointers = slices.Grow(buffer.pointers, len(buffer.keys))[:len(buffer.keys)]
+	for uuid, shortURL := range buffer.keys {
 		data := urls[shortURL]
-		records = append(records, &model.FileRecord{
+		buffer.records[uuid] = model.FileRecord{
 			UUID:        strconv.Itoa(uuid),
 			ShortURL:    shortURL,
 			OriginalURL: data.OriginalURL,
 			UserID:      data.UserID,
 			DeletedFlag: data.DeletedFlag,
-		})
+		}
+		buffer.pointers[uuid] = &buffer.records[uuid]
 	}
-	return f.writer.WriteRecords(records)
+	return f.writer.WriteRecords(buffer.pointers)
 }
